@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Logs
 logs
 *.log
@@ -25,3 +26,7 @@ dist-ssr
 
 .config/
 !.env
+=======
+node_modules/
+.env
+>>>>>>> b640b471ec424209ee50414e90b0260f587117b3
