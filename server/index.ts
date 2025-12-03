@@ -5,8 +5,41 @@ import { handleDemo } from "./routes/demo";
 import { handleDbPing } from "./routes/db-ping";
 import { handleCreateCustomer } from "./routes/customers";
 import { handleCreateDriver } from "./routes/drivers";
-import { createBooking, confirmBooking, updateBooking, listBookings, decideBooking } from "./routes/bookings";
-import { searchVehicles, checkAvailability, createVehicle, listVehicles, addVehicleDocument, addMaintenance, addMileage, addInsurancePolicy, addInsuranceClaim, addFuelLog } from "./routes/vehicles";
+import { 
+  createBooking,
+  confirmBooking,
+  decideBooking,
+  updateBooking,
+  listBookings
+} from "./routes/bookings";
+import { 
+  searchVehicles,
+  createVehicle,
+  listVehicles,
+  addVehicleDocument,
+  addMaintenance,
+  addMileage,
+  addInsurancePolicy,
+  addInsuranceClaim,
+  addFuelLog,
+  checkAvailability
+} from "./routes/vehicles";
+import { 
+  handleLogin, 
+  handleRegister, 
+  handleLogout, 
+  handleMe,
+  handlePublicRegister
+} from "./routes/auth";
+import {
+  handleListUsers,
+  handleGetUser,
+  handleCreateUser,
+  handleUpdateUser,
+  handleDeleteUser,
+  handleGetUserStats
+} from "./routes/users";
+import { authenticate, authorize } from "./middleware/auth";
 
 export function createServer() {
   const app = express();
@@ -17,34 +50,56 @@ export function createServer() {
   app.use(express.urlencoded({ extended: true }));
 
   // Example API routes
-  app.get("/api/ping", (_req, res) => {
-    const ping = process.env.PING_MESSAGE ?? "ping";
-    res.json({ message: ping });
-  });
-
+  app.get("/api/ping", (_, res) => res.json({ status: "ok" }));
   app.get("/api/demo", handleDemo);
   app.get("/api/db-ping", handleDbPing);
-  app.post("/api/customers", handleCreateCustomer);
-  app.post("/api/drivers", handleCreateDriver);
-  // Bookings
-  app.get("/api/bookings", listBookings);
-  app.post("/api/bookings", createBooking);
-  app.post("/api/bookings/:id/confirm", confirmBooking);
-  app.post("/api/bookings/:id/decision", decideBooking);
-  app.patch("/api/bookings/:id", updateBooking);
 
-  // Vehicles & Availability
+  // Authentication routes
+  app.post("/api/auth/login", handleLogin);
+  app.post("/api/auth/register", handleRegister);
+  app.post("/api/auth/admin-register", authenticate, authorize(['admin']), handleRegister);
+  app.post("/api/auth/logout", authenticate, handleLogout);
+  app.get("/api/auth/me", authenticate, handleMe);
+  app.post("/api/auth/public-register", handlePublicRegister);
+
+  // User management routes (admin only)
+  app.get("/api/users", authenticate, authorize(['admin']), handleListUsers);
+  app.get("/api/users/stats", authenticate, authorize(['admin']), handleGetUserStats);
+  app.get("/api/users/:id", authenticate, authorize(['admin']), handleGetUser);
+  app.post("/api/users", authenticate, authorize(['admin']), handleCreateUser);
+  app.put("/api/users/:id", authenticate, authorize(['admin']), handleUpdateUser);
+  app.delete("/api/users/:id", authenticate, authorize(['admin']), handleDeleteUser);
+
+  // Customer routes (admin only for now)
+  app.post("/api/customers", authenticate, authorize(['admin']), handleCreateCustomer);
+
+  // Driver routes (admin only for now)
+  app.post("/api/drivers", authenticate, authorize(['admin']), handleCreateDriver);
+
+  // Booking routes
+  app.post("/api/bookings", authenticate, createBooking);
+  app.get("/api/bookings", authenticate, listBookings);
+  app.patch("/api/bookings/:id/confirm", authenticate, confirmBooking);
+  app.patch("/api/bookings/:id/decide", authenticate, decideBooking);
+  app.patch("/api/bookings/:id", authenticate, updateBooking);
+
+  // Test endpoint for debugging
+  app.get("/api/auth-test", authenticate, (req, res) => {
+    res.json({ message: "Authentication working!", user: (req as any).user });
+  });
+
+  // Vehicle routes
   app.get("/api/vehicles/search", searchVehicles);
-  app.post("/api/vehicles", createVehicle);
+  app.post("/api/vehicles", authenticate, authorize(['admin']), createVehicle);
   app.get("/api/vehicles", listVehicles);
-  app.post("/api/vehicles/:id/documents", addVehicleDocument);
-  app.post("/api/vehicles/:id/maintenance", addMaintenance);
-  app.post("/api/vehicles/:id/mileage", addMileage);
-  app.post("/api/vehicles/:id/insurance/policies", addInsurancePolicy);
-  app.post("/api/vehicles/:id/insurance/claims", addInsuranceClaim);
-  app.post("/api/vehicles/:id/fuel-logs", addFuelLog);
-  app.get("/api/availability", checkAvailability);
-  app.post("/api/availability", checkAvailability);
+  app.post("/api/vehicles/:id/documents", authenticate, addVehicleDocument);
+  app.post("/api/vehicles/:id/maintenance", authenticate, addMaintenance);
+  app.post("/api/vehicles/:id/mileage", authenticate, addMileage);
+  app.post("/api/vehicles/:id/insurance", authenticate, addInsurancePolicy);
+  app.post("/api/vehicles/:id/claims", authenticate, addInsuranceClaim);
+  app.post("/api/vehicles/:id/fuel", authenticate, addFuelLog);
+  app.get("/api/vehicles/:id/availability", checkAvailability);
+  app.get("/api/vehicles/availability", checkAvailability);
 
   return app;
 }

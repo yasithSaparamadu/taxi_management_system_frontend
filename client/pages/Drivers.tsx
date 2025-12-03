@@ -1,47 +1,37 @@
 import { useState } from "react";
+import { useSelector } from "react-redux";
 import type { CreateDriverRequest, CreateDriverResponse } from "@shared/api";
+import { selectToken } from "../store/auth";
 
 export default function Drivers() {
+  const token = useSelector(selectToken);
   const [form, setForm] = useState<CreateDriverRequest>({
     first_name: "",
     last_name: "",
-    email: "",
-    phone: "",
     license_number: "",
-    license_expiry: "",
-    hire_date: "",
-    dob: "",
+    phone: "",
     address: "",
-    city: "",
-    state: "",
-    zipcode: "",
-    experience_years: undefined,
-    salary_cents: undefined,
-    status: "active",
-    notes: "",
+    hire_date: "",
   });
-  const [adminToken, setAdminToken] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target as HTMLInputElement;
-    setForm((f) => ({ ...f, [name]: value }));
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    setMessage(null);
-    setError(null);
+    if (!form.first_name?.trim() || !form.last_name?.trim() || !form.license_number?.trim()) {
+      setError("First name, Last name, and License number are required");
+      return;
+    }
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     try {
-      if (!form.first_name?.trim() || !form.last_name?.trim() || !form.license_number?.trim()) {
-        setError("First name, Last name, and License number are required");
-        return;
-      }
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (adminToken.trim().length > 0) headers["x-admin-token"] = adminToken.trim();
       const res = await fetch("/api/drivers", {
         method: "POST",
         headers,
@@ -75,11 +65,6 @@ export default function Drivers() {
       {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-red-700">{error}</div>}
 
       <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Admin Token (optional if server not configured)</label>
-          <input className="w-full rounded border px-3 py-2" value={adminToken} onChange={(e) => setAdminToken(e.target.value)} />
-        </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">First Name *</label>

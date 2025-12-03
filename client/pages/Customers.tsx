@@ -1,19 +1,21 @@
 import { useState } from "react";
-import { type CreateCustomerRequest, type CreateCustomerResponse } from "@shared/api";
+import { useSelector } from "react-redux";
+import type { CreateCustomerRequest, CreateCustomerResponse } from "@shared/api";
+import { selectToken } from "../store/auth";
 
 export default function Customers() {
+  const token = useSelector(selectToken);
   // Simple admin registration form (no auth gating yet)
   const [form, setForm] = useState<CreateCustomerRequest>({
     first_name: "",
     last_name: "",
-    email: "",
     phone: "",
+    email: "",
     notes: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [adminToken, setAdminToken] = useState<string>("");
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -22,18 +24,15 @@ export default function Customers() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    setMessage(null);
-    setError(null);
+    if (!form.first_name.trim() || !form.last_name.trim()) {
+      setError("First name and Last name are required");
+      return;
+    }
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     try {
-      if (!form.first_name.trim() || !form.last_name.trim()) {
-        setError("First name and Last name are required");
-        return;
-      }
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (adminToken.trim().length > 0) {
-        headers["x-admin-token"] = adminToken.trim();
-      }
       const res = await fetch("/api/customers", {
         method: "POST",
         headers,
@@ -61,18 +60,7 @@ export default function Customers() {
       {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-red-700">{error}</div>}
 
       <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Admin Token (optional if server not configured)</label>
-          <input
-            className="w-full rounded border px-3 py-2"
-            name="adminToken"
-            value={adminToken}
-            onChange={(e) => setAdminToken(e.target.value)}
-            placeholder="Enter admin token to authorize"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">First Name *</label>
             <input

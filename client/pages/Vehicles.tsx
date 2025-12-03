@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import type {
   Vehicle,
   ListVehiclesResponse,
@@ -11,12 +12,21 @@ import type {
   AddInsuranceClaimRequest,
   AddFuelLogRequest,
 } from "@shared/api";
+import { selectToken } from "../store/auth";
+
+const headers = (token: string | null) => {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    h["Authorization"] = `Bearer ${token}`;
+  }
+  return h;
+};
 
 export default function Vehicles() {
+  const token = useSelector(selectToken);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [adminToken, setAdminToken] = useState("");
 
   // Create form state
   const [form, setForm] = useState<CreateVehicleRequest>({ name: "", status: "active" });
@@ -41,17 +51,14 @@ export default function Vehicles() {
     fetchVehicles();
   }, []);
 
-  const createVehicle = async () => {
+  const create = async () => {
     if (!canCreate) return;
     try {
       setLoading(true);
       setError(null);
       const res = await fetch("/api/vehicles", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(adminToken ? { "x-admin-token": adminToken } : {}),
-        },
+        headers: headers(token),
         body: JSON.stringify(form),
       });
       const data: CreateVehicleResponse = await res.json();
@@ -72,15 +79,31 @@ export default function Vehicles() {
         <p className="text-sm text-gray-600">Register vehicles; manage documents, maintenance, mileage, insurance, and fuel logs.</p>
       </header>
 
-      <section className="space-y-3 border rounded-md p-4">
-        <h2 className="font-medium">Admin Token</h2>
-        <input
-          type="password"
-          placeholder="x-admin-token (optional if server has no ADMIN_TOKEN)"
-          className="border rounded px-2 py-1 w-full"
-          value={adminToken}
-          onChange={(e) => setAdminToken(e.target.value)}
-        />
+      <section className="space-y-4 border rounded-md p-4">
+        <h2 className="font-medium">Create Vehicle</h2>
+        <div className="flex gap-2">
+          <input
+            placeholder="Vehicle name"
+            className="border rounded px-2 py-1 flex-1"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+          <select
+            className="border rounded px-2 py-1"
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value as "active" | "inactive" })}
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <button
+            className="px-3 py-1 border rounded bg-blue-600 text-white disabled:bg-gray-400"
+            disabled={!canCreate || loading}
+            onClick={create}
+          >
+            {loading ? "Creating..." : "Create"}
+          </button>
+        </div>
       </section>
 
       <section className="space-y-4 border rounded-md p-4">
@@ -109,7 +132,7 @@ export default function Vehicles() {
         <div className="flex items-center gap-3">
           <button
             className="bg-blue-600 text-white px-4 py-1.5 rounded disabled:opacity-50"
-            onClick={createVehicle}
+            onClick={create}
             disabled={!canCreate || loading}
           >
             {loading ? "Saving..." : "Create Vehicle"}
@@ -122,7 +145,7 @@ export default function Vehicles() {
         <h2 className="font-medium">Fleet ({vehicles.length})</h2>
         <div className="grid grid-cols-1 gap-4">
           {vehicles.map((v) => (
-            <VehicleCard key={v.id} v={v} adminToken={adminToken} onChanged={fetchVehicles} />
+            <VehicleCard key={v.id} v={v} onChanged={fetchVehicles} token={token} />
           ))}
           {vehicles.length === 0 && <div className="text-sm text-gray-600">No vehicles yet.</div>}
         </div>
@@ -131,7 +154,7 @@ export default function Vehicles() {
   );
 }
 
-function VehicleCard({ v, adminToken, onChanged }: { v: Vehicle; adminToken: string; onChanged: () => void }) {
+function VehicleCard({ v, onChanged, token }: { v: Vehicle; onChanged: () => void; token: string | null }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <div className="border rounded-md p-4">
@@ -151,12 +174,12 @@ function VehicleCard({ v, adminToken, onChanged }: { v: Vehicle; adminToken: str
         </div>
       </div>
 
-      {open === "doc" && <AddDocForm vehicleId={v.id} adminToken={adminToken} onDone={() => { setOpen(null); onChanged(); }} />}
-      {open === "maint" && <AddMaintForm vehicleId={v.id} adminToken={adminToken} onDone={() => { setOpen(null); onChanged(); }} />}
-      {open === "mileage" && <AddMileageForm vehicleId={v.id} onDone={() => { setOpen(null); onChanged(); }} />}
-      {open === "policy" && <AddPolicyForm vehicleId={v.id} adminToken={adminToken} onDone={() => { setOpen(null); onChanged(); }} />}
-      {open === "claim" && <AddClaimForm vehicleId={v.id} adminToken={adminToken} onDone={() => { setOpen(null); onChanged(); }} />}
-      {open === "fuel" && <AddFuelForm vehicleId={v.id} onDone={() => { setOpen(null); onChanged(); }} />}
+      {open === "doc" && <AddDocForm vehicleId={v.id} onDone={() => { setOpen(null); onChanged(); }} token={token} />}
+      {open === "maint" && <AddMaintForm vehicleId={v.id} onDone={() => { setOpen(null); onChanged(); }} token={token} />}
+      {open === "mileage" && <AddMileageForm vehicleId={v.id} onDone={() => { setOpen(null); onChanged(); }} token={token} />}
+      {open === "policy" && <AddPolicyForm vehicleId={v.id} onDone={() => { setOpen(null); onChanged(); }} token={token} />}
+      {open === "claim" && <AddClaimForm vehicleId={v.id} onDone={() => { setOpen(null); onChanged(); }} token={token} />}
+      {open === "fuel" && <AddFuelForm vehicleId={v.id} onDone={() => { setOpen(null); onChanged(); }} token={token} />}
     </div>
   );
 }
@@ -184,7 +207,7 @@ function NumberField({ label, value, onChange }: { label: string; value?: number
   );
 }
 
-function AddDocForm({ vehicleId, adminToken, onDone }: { vehicleId: number; adminToken: string; onDone: () => void }) {
+function AddDocForm({ vehicleId, onDone, token }: { vehicleId: number; onDone: () => void; token: string | null }) {
   const [data, setData] = useState<AddVehicleDocumentRequest>({ type: "other", title: "", file_url: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -193,7 +216,7 @@ function AddDocForm({ vehicleId, adminToken, onDone }: { vehicleId: number; admi
       setSaving(true); setErr(null);
       const res = await fetch(`/api/vehicles/${vehicleId}/documents`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(adminToken ? { "x-admin-token": adminToken } : {}) },
+        headers: headers(token),
         body: JSON.stringify(data),
       });
       const j = await res.json();
@@ -222,7 +245,7 @@ function AddDocForm({ vehicleId, adminToken, onDone }: { vehicleId: number; admi
   );
 }
 
-function AddMaintForm({ vehicleId, adminToken, onDone }: { vehicleId: number; adminToken: string; onDone: () => void }) {
+function AddMaintForm({ vehicleId, onDone, token }: { vehicleId: number; onDone: () => void; token: string | null }) {
   const [data, setData] = useState<AddMaintenanceRequest>({ title: "", schedule_date: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -231,7 +254,7 @@ function AddMaintForm({ vehicleId, adminToken, onDone }: { vehicleId: number; ad
       setSaving(true); setErr(null);
       const res = await fetch(`/api/vehicles/${vehicleId}/maintenance`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(adminToken ? { "x-admin-token": adminToken } : {}) },
+        headers: headers(token),
         body: JSON.stringify(data),
       });
       const j = await res.json();
@@ -255,7 +278,7 @@ function AddMaintForm({ vehicleId, adminToken, onDone }: { vehicleId: number; ad
   );
 }
 
-function AddMileageForm({ vehicleId, onDone }: { vehicleId: number; onDone: () => void }) {
+function AddMileageForm({ vehicleId, onDone, token }: { vehicleId: number; onDone: () => void; token: string | null }) {
   const [data, setData] = useState<AddMileageRequest>({ odometer_km: 0, job_sheet_url: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -286,7 +309,7 @@ function AddMileageForm({ vehicleId, onDone }: { vehicleId: number; onDone: () =
   );
 }
 
-function AddPolicyForm({ vehicleId, adminToken, onDone }: { vehicleId: number; adminToken: string; onDone: () => void }) {
+function AddPolicyForm({ vehicleId, onDone, token }: { vehicleId: number; onDone: () => void; token: string | null }) {
   const [data, setData] = useState<AddInsurancePolicyRequest>({ provider: "", policy_number: "", start_date: "", expiry_date: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -295,7 +318,7 @@ function AddPolicyForm({ vehicleId, adminToken, onDone }: { vehicleId: number; a
       setSaving(true); setErr(null);
       const res = await fetch(`/api/vehicles/${vehicleId}/insurance/policies`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(adminToken ? { "x-admin-token": adminToken } : {}) },
+        headers: headers(token),
         body: JSON.stringify(data),
       });
       const j = await res.json();
@@ -337,7 +360,7 @@ function AddPolicyForm({ vehicleId, adminToken, onDone }: { vehicleId: number; a
   );
 }
 
-function AddClaimForm({ vehicleId, adminToken, onDone }: { vehicleId: number; adminToken: string; onDone: () => void }) {
+function AddClaimForm({ vehicleId, onDone, token }: { vehicleId: number; onDone: () => void; token: string | null }) {
   const [data, setData] = useState<AddInsuranceClaimRequest>({ incident_date: "", description: "", status: "open" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -346,7 +369,7 @@ function AddClaimForm({ vehicleId, adminToken, onDone }: { vehicleId: number; ad
       setSaving(true); setErr(null);
       const res = await fetch(`/api/vehicles/${vehicleId}/insurance/claims`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(adminToken ? { "x-admin-token": adminToken } : {}) },
+        headers: headers(token),
         body: JSON.stringify(data),
       });
       const j = await res.json();
@@ -379,7 +402,7 @@ function AddClaimForm({ vehicleId, adminToken, onDone }: { vehicleId: number; ad
   );
 }
 
-function AddFuelForm({ vehicleId, onDone }: { vehicleId: number; onDone: () => void }) {
+function AddFuelForm({ vehicleId, onDone, token }: { vehicleId: number; onDone: () => void; token: string | null }) {
   const [data, setData] = useState<AddFuelLogRequest>({ liters: 0, cost_cents: 0, filled_at: new Date().toISOString().slice(0,16) });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);

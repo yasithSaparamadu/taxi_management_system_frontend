@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
 import type { CreateBookingRequest, CreateBookingResponse, ListBookingsResponse, Booking } from "@shared/api";
+import { selectToken } from "../store/auth";
 
 export default function Bookings() {
-  const [staffToken, setStaffToken] = useState("");
-  const [adminToken, setAdminToken] = useState("");
+  const token = useSelector(selectToken);
+  const directToken = localStorage.getItem('token');
+  console.log("Bookings component - token from Redux:", token);
+  console.log("Bookings component - token from localStorage:", directToken);
+  console.log("Bookings component - tokens match:", token === directToken);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,27 +27,53 @@ export default function Bookings() {
 
   const headers = (): Record<string, string> => {
     const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (staffToken.trim()) h["x-staff-token"] = staffToken.trim();
-    if (adminToken.trim()) h["x-admin-token"] = adminToken.trim();
+    console.log("Bookings.tsx - token:", token);
+    console.log("Bookings.tsx - directToken:", directToken);
+    if (token) {
+      h["Authorization"] = `Bearer ${token}`;
+      console.log("Bookings.tsx - Authorization header set:", h["Authorization"]);
+    } else {
+      console.log("Bookings.tsx - No token found!");
+    }
     return h;
   };
 
   const load = async () => {
     try {
       setError(null);
+      console.log("Bookings.tsx - Making request to /api/bookings");
       const res = await fetch(`/api/bookings`, { headers: headers() });
+      console.log("Bookings.tsx - Response status:", res.status);
+      console.log("Bookings.tsx - Response headers:", res.headers);
       const data: ListBookingsResponse = await res.json();
+      console.log("Bookings.tsx - Response data:", data);
       if (!res.ok || !data.ok) throw new Error("Failed to load bookings");
       setItems(data.items);
     } catch (e: any) {
+      console.error("Bookings.tsx - Error in load:", e);
       setError(e?.message ?? "Failed to load bookings");
     }
   };
 
+  const testAuth = async () => {
+    try {
+      console.log("Bookings.tsx - Testing auth with /api/auth-test");
+      const res = await fetch(`/api/auth-test`, { headers: headers() });
+      console.log("Bookings.tsx - Auth test response status:", res.status);
+      const data = await res.json();
+      console.log("Bookings.tsx - Auth test response data:", data);
+    } catch (e: any) {
+      console.error("Bookings.tsx - Auth test error:", e);
+    }
+  };
+
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (token) {
+      load();
+    } else {
+      console.log("Bookings useEffect - No token available, skipping load");
+    }
+  }, [token]);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target as HTMLInputElement;
@@ -75,21 +106,26 @@ export default function Bookings() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-6 space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold mb-1">Create Booking (Office Staff)</h1>
-        <p className="text-sm text-gray-500 mb-4">Use Staff Token to create; Admin Token also works.</p>
+    <div className="p-6">
+      <h1 className="text-2xl font-semibold mb-1">Bookings</h1>
+      <p className="text-sm text-gray-500 mb-4">Manage booking operations</p>
 
-        {message && <div className="mb-4 rounded-md bg-green-50 p-3 text-green-700">{message}</div>}
-        {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-red-700">{error}</div>}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <input className="w-full rounded border px-3 py-2" placeholder="Staff Token" value={staffToken} onChange={(e) => setStaffToken(e.target.value)} />
-          <input className="w-full rounded border px-3 py-2" placeholder="Admin Token (optional)" value={adminToken} onChange={(e) => setAdminToken(e.target.value)} />
+      {!token && (
+        <div className="mb-4 rounded-md bg-yellow-50 p-3 text-yellow-700">
+          Please log in to access bookings. Token status: {token ? "Available" : "Not available"}
         </div>
+      )}
+
+      {message && <div className="mb-4 rounded-md bg-green-50 p-3 text-green-700">{message}</div>}
+      {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-red-700">{error}</div>}
+
+
+      <div>
+        <h1 className="text-2xl font-semibold mb-1">Create Booking</h1>
+        <p className="text-sm text-gray-500 mb-4">Create new bookings for customers</p>
 
         <form onSubmit={onSubmit} className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Customer ID</label>
               <input name="customer_id" type="number" className="w-full rounded border px-3 py-2" value={form.customer_id} onChange={onChange} />

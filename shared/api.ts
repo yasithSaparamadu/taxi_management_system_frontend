@@ -358,3 +358,115 @@ export interface DecisionRequest {
 }
 
 export interface DecisionResponse { ok: boolean; error?: string }
+
+/**
+ * Authentication and User Management
+ */
+export type UserRole = 'admin' | 'driver' | 'customer';
+export type UserStatus = 'active' | 'inactive' | 'suspended';
+
+export interface User {
+  id: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  status: UserStatus;
+  created_at?: string;
+  profile?: UserProfile;
+  driver_profile?: DriverProfile;
+}
+
+export interface UserProfile {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  address?: string;
+  payment_preferences?: any;
+}
+
+export interface DriverProfile {
+  license_number?: string;
+  id_proof_url?: string;
+  work_permit_url?: string;
+  employment_status?: 'active' | 'inactive' | 'suspended';
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  ok: boolean;
+  token?: string;
+  user?: User;
+  error?: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  role: UserRole;
+  phone?: string;
+  profile?: UserProfile;
+  driver_profile?: DriverProfile;
+}
+
+export interface RegisterResponse {
+  ok: boolean;
+  userId?: string;
+  error?: string;
+}
+
+export interface PublicRegisterRequest {
+  email: string;
+  password: string;
+  phone?: string;
+  profile?: UserProfile;
+}
+
+export interface LogoutResponse {
+  ok: boolean;
+  message?: string;
+  error?: string;
+}
+
+export interface MeResponse {
+  ok: boolean;
+  user?: User;
+  error?: string;
+}
+
+export interface UserManagementRequest {
+  email?: string;
+  role?: UserRole;
+  status?: UserStatus;
+  page?: number;
+  limit?: number;
+}
+
+export interface UserManagementResponse {
+  ok: boolean;
+  users?: User[];
+  total?: number;
+  error?: string;
+}
+
+export interface UpdateUserRequest {
+  phone?: string;
+  status?: UserStatus;
+  profile?: Partial<UserProfile>;
+  driver_profile?: Partial<DriverProfile>;
+}
+
+export interface UpdateUserResponse {
+  ok: boolean;
+  user?: User;
+  error?: string;
+}
+
+export interface DeleteUserResponse {
+  ok: boolean;
+  message?: string;
+  error?: string;
+}
