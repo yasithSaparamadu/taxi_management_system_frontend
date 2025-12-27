@@ -57,10 +57,8 @@ export function createServer() {
   // Authentication routes
   app.post("/api/auth/login", handleLogin);
   app.post("/api/auth/register", handleRegister);
-  app.post("/api/auth/admin-register", authenticate, authorize(['admin']), handleRegister);
   app.post("/api/auth/logout", authenticate, handleLogout);
   app.get("/api/auth/me", authenticate, handleMe);
-  app.post("/api/auth/public-register", handlePublicRegister);
 
   // User management routes (admin only)
   app.get("/api/users", authenticate, authorize(['admin']), handleListUsers);

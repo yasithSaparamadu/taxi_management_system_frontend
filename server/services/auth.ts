@@ -163,96 +163,94 @@ export class AuthService {
     };
   }
 
-  static async createUser(userData: {
-    email: string;
-    password: string;
-    role: 'admin' | 'driver' | 'customer';
-    phone?: string;
-    profile?: {
-      first_name?: string;
-      last_name?: string;
-      address?: string;
-      payment_preferences?: any;
-    };
-    driver_profile?: {
-      license_number?: string;
-      id_proof_url?: string;
-      work_permit_url?: string;
-      employment_status?: 'active' | 'inactive' | 'suspended';
-    };
-  }): Promise<string> {
-    const connection = await pool.getConnection();
-    
-    try {
-      await connection.beginTransaction();
+// Replace the current createUser method with this updated version
+static async createUser(userData: {
+  email: string;
+  password: string;
+  role: 'admin' | 'driver' | 'customer';
+  phone?: string;
+  profile?: {
+    first_name?: string;
+    last_name?: string;
+    address?: string;
+    payment_preferences?: any;
+  };
+  driver_profile?: {
+    license_number?: string;
+    id_proof_url?: string;
+    work_permit_url?: string;
+    employment_status?: 'active' | 'inactive' | 'suspended';
+  };
+}): Promise<number> {  // Changed return type to number since we're using auto-increment ID
+  const connection = await pool.getConnection();
+  
+  try {
+    await connection.beginTransaction();
 
-      // Generate UUID for the user
-      const userId = crypto.randomUUID();
+    // Insert user - let the database generate the ID
+    const passwordHash = await this.hashPassword(userData.password);
+    const [result] = await connection.execute(`
+      INSERT INTO users (email, password_hash, role, status, phone)
+      VALUES (?, ?, ?, 'active', ?)
+    `, [userData.email, passwordHash, userData.role, userData.phone || null]) as any;
 
-      // Insert user
-      const passwordHash = await this.hashPassword(userData.password);
+    const userId = result.insertId;
+
+    // Rest of the method remains the same...
+    if (userData.profile) {
       await connection.execute(`
-        INSERT INTO users (id, email, password_hash, role, status, phone)
-        VALUES (?, ?, ?, ?, 'active', ?)
-      `, [userId, userData.email, passwordHash, userData.role, userData.phone || null]);
-
-      // Insert profile if provided
-      if (userData.profile) {
-        await connection.execute(`
-          INSERT INTO profiles (user_id, first_name, last_name, address, payment_preferences)
-          VALUES (?, ?, ?, ?, ?)
-        `, [
-          userId,
-          userData.profile.first_name || null,
-          userData.profile.last_name || null,
-          userData.profile.address || null,
-          userData.profile.payment_preferences ? JSON.stringify(userData.profile.payment_preferences) : null
-        ]);
-      }
-
-      // Insert driver profile if provided
-      if (userData.driver_profile && userData.role === 'driver') {
-        await connection.execute(`
-          INSERT INTO driver_profiles (user_id, license_number, id_proof_url, work_permit_url, employment_status)
-          VALUES (?, ?, ?, ?, ?)
-        `, [
-          userId,
-          userData.driver_profile.license_number || null,
-          userData.driver_profile.id_proof_url || null,
-          userData.driver_profile.work_permit_url || null,
-          userData.driver_profile.employment_status || 'active'
-        ]);
-      }
-
-      await connection.commit();
-      return userId;
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
+        INSERT INTO profiles (user_id, first_name, last_name, address, payment_preferences)
+        VALUES (?, ?, ?, ?, ?)
+      `, [
+        userId,
+        userData.profile.first_name || null,
+        userData.profile.last_name || null,
+        userData.profile.address || null,
+        userData.profile.payment_preferences ? JSON.stringify(userData.profile.payment_preferences) : null
+      ]);
     }
+
+    if (userData.driver_profile && userData.role === 'driver') {
+      await connection.execute(`
+        INSERT INTO driver_profiles (
+          user_id, 
+          license_number, 
+          id_proof_url, 
+          work_permit_url, 
+          employment_status
+        ) VALUES (?, ?, ?, ?, ?)
+      `, [
+        userId,
+        userData.driver_profile.license_number || null,
+        userData.driver_profile.id_proof_url || null,
+        userData.driver_profile.work_permit_url || null,
+        userData.driver_profile.employment_status || 'inactive'
+      ]);
+    }
+
+    await connection.commit();
+    return userId;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
+}
 
-  static async createSession(userId: string, token: string): Promise<void> {
-    const tokenHash = await this.hashToken(token);
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+static async createSession(userId: string | number, token: string): Promise<void> {
+  const tokenHash = await this.hashToken(token);
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
 
-    console.log("AuthService - Creating session for user:", userId);
-    console.log("AuthService - Token hash:", tokenHash.substring(0, 20) + "...");
-    console.log("AuthService - Expires at:", expiresAt);
-
-    // Generate UUID for the session
-    const sessionId = crypto.randomUUID();
-
-    await pool.execute(`
-      INSERT INTO user_sessions (id, user_id, token_hash, expires_at)
-      VALUES (?, ?, ?, ?)
-    `, [sessionId, userId, tokenHash, expiresAt]);
-    
-    console.log("AuthService - Session created successfully");
-  }
+  await pool.execute(`
+    INSERT INTO user_sessions (user_id, token_hash, expires_at)
+    VALUES (?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      token_hash = VALUES(token_hash),
+      expires_at = VALUES(expires_at)
+  `, [userId, tokenHash, expiresAt]);
+}
 
   static async revokeSession(token: string): Promise<void> {
     const tokenHash = await this.hashToken(token);

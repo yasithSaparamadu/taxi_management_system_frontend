@@ -28,13 +28,9 @@ const LoginSchema = z.object({
   password: z.string()
 });
 
-// Admin-only registration
+// Public registration
 export const handleRegister: RequestHandler = async (req, res) => {
   try {
-    // Only admins can register new users
-    if (!req.user || req.user.role !== 'admin') {
-      return res.status(403).json({ ok: false, error: 'Admin access required' });
-    }
 
     const parsed = RegisterSchema.safeParse(req.body);
     if (!parsed.success) {
