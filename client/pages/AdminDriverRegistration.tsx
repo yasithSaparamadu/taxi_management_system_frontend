@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Car, User, Mail, Phone, Save, FileText, Badge, Upload, X } from 'lucide-react';
+import { ArrowLeft, Car, User, Mail, Phone, Save, FileText, Badge, Upload, X, Eye } from 'lucide-react';
 
 interface DriverFormData {
   email: string;
@@ -18,9 +18,11 @@ interface DriverFormData {
   license_number: string;
   id_proof_url: string;
   work_permit_url: string;
+  profile_image_url: string;
   employment_status: 'active' | 'inactive' | 'suspended';
   id_proof_file?: File;
   work_permit_file?: File;
+  profile_image_file?: File;
 }
 
 export default function AdminDriverRegistration() {
@@ -38,6 +40,7 @@ export default function AdminDriverRegistration() {
     license_number: '',
     id_proof_url: '',
     work_permit_url: '',
+    profile_image_url: '',
     employment_status: 'active'
   });
 
@@ -96,8 +99,9 @@ export default function AdminDriverRegistration() {
       // Upload documents first if they exist
       let idProofUrl = formData.id_proof_url;
       let workPermitUrl = formData.work_permit_url;
+      let profileImageUrl = formData.profile_image_url;
       
-      if (formData.id_proof_file || formData.work_permit_file) {
+      if (formData.id_proof_file || formData.work_permit_file || formData.profile_image_file) {
         const uploadFormData = new FormData();
         
         if (formData.id_proof_file) {
@@ -106,6 +110,10 @@ export default function AdminDriverRegistration() {
         
         if (formData.work_permit_file) {
           uploadFormData.append('work_permit', formData.work_permit_file);
+        }
+
+        if (formData.profile_image_file) {
+          uploadFormData.append('profile_image', formData.profile_image_file);
         }
 
         const uploadResponse = await fetch('/api/upload/driver-documents', {
@@ -128,6 +136,9 @@ export default function AdminDriverRegistration() {
         if (uploadData.files.work_permit_url) {
           workPermitUrl = uploadData.files.work_permit_url;
         }
+        if (uploadData.files.profile_image_url) {
+          profileImageUrl = uploadData.files.profile_image_url;
+        }
       }
 
       // Debug: Log the data being sent
@@ -139,7 +150,8 @@ export default function AdminDriverRegistration() {
         profile: {
           first_name: formData.first_name,
           last_name: formData.last_name,
-          address: formData.address
+          address: formData.address,
+          profile_image_url: profileImageUrl
         }
       };
 
@@ -189,6 +201,7 @@ export default function AdminDriverRegistration() {
           license_number: '',
           id_proof_url: '',
           work_permit_url: '',
+          profile_image_url: '',
           employment_status: 'active'
         });
       } else {
@@ -337,6 +350,58 @@ export default function AdminDriverRegistration() {
                         onChange={(e) => handleInputChange('address', e.target.value)}
                         rows={3}
                       />
+                    </div>
+                  </div>
+
+                  {/* Profile Image */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-gray-900">Profile Image</h3>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="profile_image">Profile Image</Label>
+                      <div className="flex items-center space-x-4">
+                        {formData.profile_image_url && (
+                          <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100">
+                            <img 
+                              src={formData.profile_image_url} 
+                              alt="Profile preview" 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = '';
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 space-y-2">
+                          <div className="flex space-x-2">
+                            <Input
+                              id="profile_image_url"
+                              value={formData.profile_image_url}
+                              onChange={(e) => handleInputChange('profile_image_url', e.target.value)}
+                              placeholder="/uploads/images/profile.jpg"
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => formData.profile_image_url && window.open(formData.profile_image_url, '_blank')}
+                              disabled={!formData.profile_image_url}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleInputChange('profile_image_file', e.target.files?.[0] || null)}
+                              className="flex-1"
+                            />
+                            <span className="text-sm text-gray-500">or upload image</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 

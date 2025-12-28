@@ -6,7 +6,14 @@ import fs from "fs";
 // Configure storage for uploaded files
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(process.cwd(), 'uploads', 'documents');
+    let uploadDir: string;
+    
+    // Determine upload directory based on field name
+    if (file.fieldname === 'profile_image') {
+      uploadDir = path.join(process.cwd(), 'uploads', 'images');
+    } else {
+      uploadDir = path.join(process.cwd(), 'uploads', 'documents');
+    }
     
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
@@ -31,6 +38,8 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
     'image/jpeg',
     'image/jpg',
     'image/png',
+    'image/gif',
+    'image/webp',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ];
@@ -38,7 +47,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only PDF, JPG, PNG, and Word documents are allowed.'));
+    cb(new Error('Invalid file type. Only PDF, JPG, PNG, GIF, WebP, and Word documents are allowed.'));
   }
 };
 
@@ -48,14 +57,15 @@ const upload = multer({
   fileFilter: fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 2 // Maximum 2 files (ID proof and work permit)
+    files: 3 // Maximum 3 files (ID proof, work permit, and profile image)
   }
 });
 
 // Handle document upload for driver registration
 export const handleDriverDocumentUpload: RequestHandler = upload.fields([
   { name: 'id_proof', maxCount: 1 },
-  { name: 'work_permit', maxCount: 1 }
+  { name: 'work_permit', maxCount: 1 },
+  { name: 'profile_image', maxCount: 1 }
 ]);
 
 // Get uploaded file info
@@ -78,6 +88,10 @@ export const handleDriverDocumentUploadInfo: RequestHandler = (req, res) => {
     
     if (files.work_permit && files.work_permit[0]) {
       uploadedFiles.work_permit_url = `/uploads/documents/${files.work_permit[0].filename}`;
+    }
+
+    if (files.profile_image && files.profile_image[0]) {
+      uploadedFiles.profile_image_url = `/uploads/images/${files.profile_image[0].filename}`;
     }
 
     res.json({
