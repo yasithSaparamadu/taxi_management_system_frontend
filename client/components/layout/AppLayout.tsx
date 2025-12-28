@@ -1,16 +1,11 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Calendar, Car, Users, Receipt, BarChart3, ClipboardList, LayoutDashboard, Menu, X } from "lucide-react";
+import { Calendar, LayoutDashboard, Menu, X } from "lucide-react";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/bookings", label: "Bookings", icon: ClipboardList },
   { to: "/calendar", label: "Calendar", icon: Calendar },
-  { to: "/vehicles", label: "Vehicles", icon: Car },
-  { to: "/customers", label: "Customers", icon: Users },
-  { to: "/invoices", label: "Invoices", icon: Receipt },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
 ];
 
 function Header({ onMenu }: { onMenu: () => void }) {
@@ -24,23 +19,8 @@ function Header({ onMenu }: { onMenu: () => void }) {
           <div className="h-7 w-7 rounded-md bg-brand text-brand-foreground grid place-items-center font-bold">F</div>
           <span className="text-lg tracking-tight">FleetWise Admin</span>
         </div>
-        <div className="mx-4 hidden md:flex flex-1 max-w-xl items-center">
-          <div className="relative w-full">
-            <input
-              placeholder="Search bookings, vehicles, drivers..."
-              className="w-full rounded-md border bg-background px-3 py-2 pl-9 text-sm outline-none ring-0 focus:border-ring"
-            />
-            <svg className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.9 14.32a8 8 0 111.414-1.414l4.387 4.387-1.414 1.414-4.387-4.387zM14 8a6 6 0 11-12 0 6 6 0 0112 0z" clipRule="evenodd"/></svg>
-          </div>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <select className="rounded-md border bg-background px-2 py-1 text-sm">
-            <option>Admin</option>
-            <option>Driver</option>
-            <option>Customer</option>
-          </select>
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand to-primary grid place-items-center text-xs font-bold text-brand-foreground">YS</div>
-        </div>
+       
+        
       </div>
     </header>
   );

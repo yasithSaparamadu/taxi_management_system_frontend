@@ -1,29 +1,17 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { selectUser } from '../store/auth';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Users, Car, Calendar, Settings, LogOut, Plus } from 'lucide-react';
+import { Car, Calendar, Plus, ArrowLeft, User } from 'lucide-react';
 
 export default function AdminDashboard() {
   const user = useSelector(selectUser);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/login');
-  };
-
   const menuItems = [
-    {
-      title: 'User Management',
-      description: 'Manage users, roles, and permissions',
-      icon: Users,
-      path: '/admin/users',
-      color: 'bg-blue-500'
-    },
     {
       title: 'Driver Registration',
       description: 'Register new drivers and manage profiles',
@@ -39,18 +27,18 @@ export default function AdminDashboard() {
       color: 'bg-orange-500'
     },
     {
-      title: 'Bookings',
-      description: 'View and manage all taxi bookings',
-      icon: Calendar,
-      path: '/bookings',
-      color: 'bg-purple-500'
+      title: 'Customer Registration',
+      description: 'Register new customers and manage profiles',
+      icon: User,
+      path: '/admin/customers',
+      color: 'bg-blue-500'
     },
     {
-      title: 'System Settings',
-      description: 'Configure system settings and preferences',
-      icon: Settings,
-      path: '/admin/settings',
-      color: 'bg-gray-500'
+      title: 'Customer Management',
+      description: 'View and edit existing customers',
+      icon: User,
+      path: '/admin/customers/manage',
+      color: 'bg-purple-500'
     }
   ];
 
@@ -65,13 +53,13 @@ export default function AdminDashboard() {
               <p className="text-sm text-gray-600">Welcome back, {user?.profile?.first_name || user?.email}</p>
             </div>
             <div className="flex items-center space-x-4">
+              <Button variant="outline" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
               <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                 Administrator
               </Badge>
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
             </div>
           </div>
         </div>
@@ -84,17 +72,21 @@ export default function AdminDashboard() {
           <div className="mb-8">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
             <div className="flex space-x-4">
-              <Button onClick={() => navigate('/admin/users')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Register User
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/admin/drivers')}>
+              <Button onClick={() => navigate('/admin/drivers')}>
                 <Plus className="h-4 w-4 mr-2" />
                 Register Driver
               </Button>
               <Button variant="outline" onClick={() => navigate('/admin/drivers/manage')}>
                 <Car className="h-4 w-4 mr-2" />
                 Manage Drivers
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/admin/customers')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Register Customer
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/admin/customers/manage')}>
+                <User className="h-4 w-4 mr-2" />
+                Manage Customers
               </Button>
             </div>
           </div>

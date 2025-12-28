@@ -163,6 +163,7 @@ export default function AdminDriverManagement() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
+          phone: editForm.phone,
           profile: {
             first_name: editForm.first_name,
             last_name: editForm.last_name,

@@ -31,7 +31,6 @@ function getRoleFromHeaders(req: any): 'admin' | 'staff' | 'unknown' {
 const isoDateTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 const CreateSchema = z.object({
-  customer_id: z.coerce.number().int().positive(),
   service_id: z.coerce.number().int().positive(),
   start_time: z.string().regex(isoDateTime, "start_time must be ISO-like e.g. 2025-09-22T10:00:00"),
   end_time: z.string().regex(isoDateTime, "end_time must be ISO-like e.g. 2025-09-22T10:30:00"),
@@ -45,12 +44,14 @@ const CreateSchema = z.object({
   estimated_price_cents: z.coerce.number().int().min(0).optional(),
   admin_note: z.string().max(5000).optional(),
   created_by_name: z.string().max(150).optional(),
+  driver_id: z.coerce.number().int().positive().nullable().optional(),
 });
 
 export const createBooking: RequestHandler = async (req, res) => {
   try {
-    const role = getRoleFromHeaders(req);
-    if (role === 'unknown') {
+    // Use JWT authentication like users route
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
       return res.status(401).json({ ok: false, error: 'Unauthorized' } as CreateBookingResponse);
     }
 
@@ -62,17 +63,16 @@ export const createBooking: RequestHandler = async (req, res) => {
 
     const [result] = await pool.execute<import('mysql2/promise').ResultSetHeader>(
       `INSERT INTO bookings (
-        customer_id, service_id, source, created_by_role, created_by_name,
+        service_id, source, created_by_role, created_by_name,
         staff_id, pickup_point, dropoff_point, special_instructions,
         contact_name, contact_phone, contact_email,
-        start_time, end_time, estimated_price_cents, status, admin_note
-      ) VALUES (?, ?, ?, ?, NULLIF(?, ''), NULL, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
-        NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, 'scheduled', NULLIF(?, ''))`,
+        start_time, end_time, estimated_price_cents, status, admin_note, driver_id
+      ) VALUES (?, ?, ?, NULLIF(?, ''), NULL, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
+        NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, 'scheduled', NULLIF(?, ''), ?)`,
       [
-        b.customer_id,
         b.service_id,
         b.source,
-        role,
+        'admin', // Default to admin role for JWT auth
         b.created_by_name ?? '',
         b.pickup_point ?? '',
         b.dropoff_point ?? '',
@@ -84,6 +84,7 @@ export const createBooking: RequestHandler = async (req, res) => {
         b.end_time.replace('T', ' '),
         b.estimated_price_cents ?? null,
         b.admin_note ?? '',
+        b.driver_id ?? null,
       ]
     );
 
@@ -91,7 +92,7 @@ export const createBooking: RequestHandler = async (req, res) => {
     await pool.execute(
       `INSERT INTO bookings_audit (booking_id, actor_role, action, admin_only_note)
        VALUES (?, ?, 'create', NULLIF(?, ''))`,
-      [result.insertId, role, b.admin_note ?? '']
+      [result.insertId, 'admin', b.admin_note ?? '']
     );
 
     const bookingId = result.insertId;
@@ -103,10 +104,8 @@ export const createBooking: RequestHandler = async (req, res) => {
       await sendEmail({
         to: adminTo,
         subject: `New booking (id ${bookingId}) pending approval`,
-        html: `<p>A new booking was created by ${role} ${b.created_by_name ?? ''}.</p>
+        html: `<p>A new booking was created by admin ${b.created_by_name ?? ''}.</p>
 <ul>
-  <li>Customer ID: ${b.customer_id}</li>
-  <li>Service ID: ${b.service_id}</li>
   <li>When: ${b.start_time} to ${b.end_time}</li>
   <li>Pickup: ${b.pickup_point ?? ''}</li>
   <li>Dropoff: ${b.dropoff_point ?? ''}</li>
@@ -376,32 +375,64 @@ export const updateBooking: RequestHandler = async (req, res) => {
 
 export const listBookings: RequestHandler = async (req, res) => {
   try {
-    const role = getRoleFromHeaders(req);
-    if (role === 'unknown') {
+    // Use JWT authentication like users route
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
       return res.status(401).json({ ok: false, items: [] } as ListBookingsResponse);
     }
+
     const { status, source } = req.query as { status?: string; source?: string };
     const conditions: string[] = [];
-    const vals: any[] = [];
-    if (status) { conditions.push('b.status=?'); vals.push(status); }
-    if (source) { conditions.push('b.source=?'); vals.push(source); }
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const params: any[] = [];
 
-    const [rows] = await pool.query<any[]>(
-      `SELECT b.* FROM bookings b ${where} ORDER BY b.created_at DESC LIMIT 200`
-    );
+    if (status) {
+      conditions.push('b.status = ?');
+      params.push(status);
+    }
 
-    // Normalize times to ISO strings
-    const items: Booking[] = rows.map((r) => ({
-      ...r,
-      start_time: new Date(r.start_time).toISOString().replace('.000Z',''),
-      end_time: new Date(r.end_time).toISOString().replace('.000Z',''),
-      created_at: new Date(r.created_at).toISOString(),
-      updated_at: new Date(r.updated_at).toISOString(),
+    if (source) {
+      conditions.push('b.source = ?');
+      params.push(source);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const query = `
+      SELECT 
+        b.id,
+        b.service_id,
+        b.source,
+        b.start_time,
+        b.end_time,
+        b.pickup_point,
+        b.dropoff_point,
+        b.estimated_price_cents,
+        b.status,
+        b.admin_note,
+        b.driver_id,
+        b.confirmed_at,
+        b.assigned_at,
+        b.outlook_event_id,
+        b.customer_verify_token,
+        b.admin_approve_token,
+        b.created_at,
+        b.updated_at
+      FROM bookings b 
+      ${whereClause}
+      ORDER BY b.created_at DESC
+    `;
+
+    const [bookings] = await pool.execute(query, params) as [any[], any];
+
+    const items = bookings.map((b: any) => ({
+      ...b,
+      created_at: new Date(b.created_at).toISOString(),
+      updated_at: new Date(b.updated_at).toISOString(),
     }));
 
     return res.json({ ok: true, items } as ListBookingsResponse);
   } catch (err: any) {
+    console.error('Error in listBookings:', err);
     return res.status(500).json({ ok: false, items: [] } as ListBookingsResponse);
   }
 };

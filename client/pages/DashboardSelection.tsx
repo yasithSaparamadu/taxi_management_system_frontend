@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { clearAuth } from '../store/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,18 +28,11 @@ interface DashboardOption {
 
 export default function DashboardSelection() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
 
   const dashboardOptions: DashboardOption[] = [
-    {
-      id: 'main',
-      title: 'Main Dashboard',
-      description: 'Complete overview with bookings, vehicles, and management tools',
-      path: '/',
-      icon: LayoutDashboard,
-      badge: 'Primary',
-      features: ['Bookings Management', 'Vehicle Fleet', 'Driver Management', 'Customer Management', 'Reports']
-    },
+    
     {
       id: 'admin',
       title: 'Admin Dashboard',
@@ -122,14 +117,69 @@ export default function DashboardSelection() {
               <Button 
                 variant="outline" 
                 onClick={() => {
+                  // Clear both localStorage and Redux state
                   localStorage.removeItem('token');
-                  navigate('/login');
+                  dispatch(clearAuth());
+                  navigate('/login', { replace: true });
                 }}
               >
                 Logout
               </Button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-600 text-sm font-medium">Active Bookings</p>
+                  <p className="text-2xl font-bold text-blue-900">24</p>
+                </div>
+                <Calendar className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-600 text-sm font-medium">Available Vehicles</p>
+                  <p className="text-2xl font-bold text-green-900">18</p>
+                </div>
+                <Car className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-purple-50 border-purple-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-600 text-sm font-medium">Active Drivers</p>
+                  <p className="text-2xl font-bold text-purple-900">12</p>
+                </div>
+                <Users className="h-8 w-8 text-purple-600" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-orange-50 border-orange-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-600 text-sm font-medium">Today's Revenue</p>
+                  <p className="text-2xl font-bold text-orange-900">$3,240</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-orange-600" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -187,57 +237,6 @@ export default function DashboardSelection() {
               </Card>
             );
           })}
-        </div>
-
-        {/* Quick Stats */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-600 text-sm font-medium">Active Bookings</p>
-                  <p className="text-2xl font-bold text-blue-900">24</p>
-                </div>
-                <Calendar className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-600 text-sm font-medium">Available Vehicles</p>
-                  <p className="text-2xl font-bold text-green-900">18</p>
-                </div>
-                <Car className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-purple-50 border-purple-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-600 text-sm font-medium">Active Drivers</p>
-                  <p className="text-2xl font-bold text-purple-900">12</p>
-                </div>
-                <Users className="h-8 w-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-orange-50 border-orange-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-600 text-sm font-medium">Today's Revenue</p>
-                  <p className="text-2xl font-bold text-orange-900">$3,240</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

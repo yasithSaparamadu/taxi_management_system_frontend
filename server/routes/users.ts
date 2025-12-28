@@ -18,10 +18,10 @@ const updateUserSchema = z.object({
   email: z.string().email().optional(),
   role: z.enum(['admin', 'driver', 'customer']).optional(),
   status: z.enum(['active', 'inactive', 'suspended']).optional(),
+  phone: z.string().max(20).optional(),
   profile: z.object({
     first_name: z.string().min(1).max(100).optional(),
     last_name: z.string().min(1).max(100).optional(),
-    phone: z.string().max(20).optional(),
     address: z.string().max(500).optional(),
     profile_image_url: z.string().optional().or(z.literal('')),
   }).optional(),
@@ -38,10 +38,10 @@ const createUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   role: z.enum(['admin', 'driver', 'customer']),
+  phone: z.string().max(20).optional(),
   profile: z.object({
     first_name: z.string().min(1).max(100),
     last_name: z.string().min(1).max(100),
-    phone: z.string().max(20).optional(),
     address: z.string().max(500).optional(),
     profile_image_url: z.string().optional().or(z.literal('')),
   }),
@@ -272,7 +272,7 @@ export const handleUpdateUser: RequestHandler = async (req, res) => {
     }
 
     // Update user basic info
-    if (updateData.email || updateData.role || updateData.status) {
+    if (updateData.email || updateData.role || updateData.status || updateData.phone) {
       const userUpdates: any[] = [];
       const userParams: any[] = [];
 
@@ -284,6 +284,11 @@ export const handleUpdateUser: RequestHandler = async (req, res) => {
         }
         userUpdates.push('email = ?');
         userParams.push(updateData.email);
+      }
+
+      if (updateData.phone !== undefined) {
+        userUpdates.push('phone = ?');
+        userParams.push(updateData.phone);
       }
 
       if (updateData.role) {

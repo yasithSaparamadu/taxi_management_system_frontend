@@ -3,7 +3,6 @@ import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
 import { handleDbPing } from "./routes/db-ping";
-import { handleCreateCustomer } from "./routes/customers";
 import { 
   createBooking,
   confirmBooking,
@@ -74,9 +73,6 @@ export function createServer() {
   app.post("/api/users", authenticate, authorize(['admin']), handleCreateUser);
   app.put("/api/users/:id", authenticate, authorize(['admin']), handleUpdateUser);
   app.delete("/api/users/:id", authenticate, authorize(['admin']), handleDeleteUser);
-
-  // Customer routes (admin only for now)
-  app.post("/api/customers", authenticate, authorize(['admin']), handleCreateCustomer);
 
   // File upload routes
   app.post("/api/upload/driver-documents", authenticate, authorize(['admin']), handleDriverDocumentUpload, handleDriverDocumentUploadInfo);

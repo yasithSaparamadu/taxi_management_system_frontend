@@ -20,23 +20,6 @@ DROP TABLE IF EXISTS `staff_availability`;
 DROP TABLE IF EXISTS `drivers`;
 DROP TABLE IF EXISTS `services`;
 DROP TABLE IF EXISTS `staff`;
-DROP TABLE IF EXISTS `customers`;
-
--- Customers
-CREATE TABLE `customers` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `first_name` VARCHAR(100) NOT NULL,
-  `last_name` VARCHAR(100) NOT NULL,
-  `email` VARCHAR(255) NULL,
-  `phone` VARCHAR(50) NULL,
-  `notes` TEXT NULL,
-  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_customers_email` (`email`),
-  KEY `idx_customers_last_first` (`last_name`, `first_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- Staff
 CREATE TABLE `staff` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -96,7 +79,6 @@ CREATE TABLE `services` (
 -- Bookings
 CREATE TABLE `bookings` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `customer_id` BIGINT UNSIGNED NOT NULL,
   `service_id` BIGINT UNSIGNED NOT NULL,
   `source` ENUM('email','phone','web') NOT NULL DEFAULT 'phone',
   `created_by_role` ENUM('admin','staff') NOT NULL DEFAULT 'staff',
@@ -123,9 +105,6 @@ CREATE TABLE `bookings` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  CONSTRAINT `fk_bookings_customer`
-    FOREIGN KEY (`customer_id`) REFERENCES `customers`(`id`)
-    ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_bookings_service`
     FOREIGN KEY (`service_id`) REFERENCES `services`(`id`)
     ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -186,10 +165,6 @@ CREATE TABLE `staff_availability` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Seed data
-INSERT INTO `customers` (`first_name`, `last_name`, `email`, `phone`) VALUES
-('Alice', 'Nguyen', 'alice@example.com', '+15550001'),
-('Bob', 'Smith', 'bob@example.com', '+15550002');
-
 INSERT INTO `staff` (`name`, `email`, `phone`, `color`) VALUES
 ('Dispatcher', 'dispatch@example.com', '+15551111', '#8b5cf6'),
 ('Driver One', 'driver1@example.com', '+15552222', '#10b981');
@@ -197,11 +172,5 @@ INSERT INTO `staff` (`name`, `email`, `phone`, `color`) VALUES
 INSERT INTO `services` (`name`, `description`, `duration_minutes`, `price_cents`) VALUES
 ('Standard Ride', 'City ride up to 10km', 30, 1000),
 ('Airport Transfer', 'To/From airport', 60, 3000);
-
--- Example booking
-INSERT INTO `bookings`
-(`customer_id`,`service_id`,`staff_id`,`start_time`,`end_time`,`status`,`notes`)
-VALUES
-(1, 1, 2, '2025-09-22 10:00:00', '2025-09-22 10:30:00', 'scheduled', 'Pickup at 5th Ave');
 
 SET FOREIGN_KEY_CHECKS = 1;

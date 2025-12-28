@@ -40,12 +40,21 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>
+        <p className="text-muted-foreground">
+          Welcome to your taxi management dashboard. Here's what's happening today.
+        </p>
+      </div>
+
+      {/* Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
-        <StatCard label="Bookings Today" value={stats.bookingsToday} accent="brand" />
-        <StatCard label="Vehicles" value={stats.vehicles} accent="primary" />
-        <StatCard label="Drivers" value={stats.drivers} accent="success" />
+        <StatCard label="Active Bookings" value={stats.bookingsToday} accent="brand" />
+        <StatCard label="Available Vehicles" value={stats.vehicles} accent="primary" />
+        <StatCard label="Active Drivers" value={stats.drivers} accent="success" />
         <StatCard label="Customers" value={stats.customers} accent="info" />
-        <StatCard label="Unpaid Invoices" value={stats.unpaidInvoices} accent="warning" />
+        <StatCard label="Today's Revenue" value={`$${(3240).toLocaleString()}`} accent="warning" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -62,7 +71,7 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ label, value, accent }: { label: string; value: number; accent?: "brand"|"primary"|"success"|"info"|"warning" }) {
+function StatCard({ label, value, accent }: { label: string; value: number | string; accent?: "brand"|"primary"|"success"|"info"|"warning" }) {
   const accentCls = accent === "success" ? "from-emerald-500/15 to-emerald-500/5 text-emerald-700 dark:text-emerald-200" :
     accent === "info" ? "from-sky-500/15 to-sky-500/5 text-sky-700 dark:text-sky-200" :
     accent === "warning" ? "from-amber-500/15 to-amber-500/5 text-amber-700 dark:text-amber-200" :
@@ -83,8 +92,7 @@ function QuickActions() {
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <a href="/bookings" className="rounded-md border px-3 py-2 hover:bg-muted">New Booking</a>
         <a href="/vehicles" className="rounded-md border px-3 py-2 hover:bg-muted">Add Vehicle</a>
-        <a href="/drivers" className="rounded-md border px-3 py-2 hover:bg-muted">Add Driver</a>
-        <a href="/customers" className="rounded-md border px-3 py-2 hover:bg-muted">Add Customer</a>
+        <a href="/admin/drivers" className="rounded-md border px-3 py-2 hover:bg-muted">Add Driver</a>
       </div>
       <div className="mt-3 rounded-md border p-3 text-xs text-muted-foreground">Admin handles all bookings, assignments, and user creation.</div>
     </div>

@@ -21,34 +21,6 @@ export interface DbPingResponse {
 }
 
 /**
- * Customers API shared types
- */
-export interface Customer {
-  id: number;
-  first_name: string;
-  last_name: string;
-  email?: string | null;
-  phone?: string | null;
-  notes?: string | null;
-  created_at: string; // ISO string
-  updated_at: string; // ISO string
-}
-
-export interface CreateCustomerRequest {
-  first_name: string;
-  last_name: string;
-  email?: string;
-  phone?: string;
-  notes?: string;
-}
-
-export interface CreateCustomerResponse {
-  ok: boolean;
-  id?: number;
-  error?: string;
-}
-
-/**
  * Drivers API shared types
  */
 export interface Driver {
@@ -105,7 +77,6 @@ export type BookingStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled
 
 export interface Booking {
   id: number;
-  customer_id: number;
   service_id: number;
   source: 'email' | 'phone' | 'web';
   created_by_role: 'admin' | 'staff';
@@ -132,7 +103,6 @@ export interface Booking {
 }
 
 export interface CreateBookingRequest {
-  customer_id: number;
   service_id: number;
   start_time: string; // YYYY-MM-DDTHH:mm:ss
   end_time: string;   // YYYY-MM-DDTHH:mm:ss
@@ -146,6 +116,7 @@ export interface CreateBookingRequest {
   estimated_price_cents?: number;
   admin_note?: string;
   created_by_name?: string;
+  driver_id?: number | null;
 }
 
 export interface CreateBookingResponse { ok: boolean; id?: number; error?: string }
