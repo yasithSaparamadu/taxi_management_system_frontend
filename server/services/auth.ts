@@ -173,6 +173,7 @@ static async createUser(userData: {
     first_name?: string;
     last_name?: string;
     address?: string;
+    profile_image_url?: string;
     payment_preferences?: any;
   };
   driver_profile?: {
@@ -199,13 +200,14 @@ static async createUser(userData: {
     // Rest of the method remains the same...
     if (userData.profile) {
       await connection.execute(`
-        INSERT INTO profiles (user_id, first_name, last_name, address, payment_preferences)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO profiles (user_id, first_name, last_name, address, profile_image_url, payment_preferences)
+        VALUES (?, ?, ?, ?, ?, ?)
       `, [
         userId,
         userData.profile.first_name || null,
         userData.profile.last_name || null,
         userData.profile.address || null,
+        userData.profile.profile_image_url && userData.profile.profile_image_url.trim() !== '' ? userData.profile.profile_image_url : null,
         userData.profile.payment_preferences ? JSON.stringify(userData.profile.payment_preferences) : null
       ]);
     }
@@ -222,8 +224,8 @@ static async createUser(userData: {
       `, [
         userId,
         userData.driver_profile.license_number || null,
-        userData.driver_profile.id_proof_url || null,
-        userData.driver_profile.work_permit_url || null,
+        userData.driver_profile.id_proof_url && userData.driver_profile.id_proof_url.trim() !== '' ? userData.driver_profile.id_proof_url : null,
+        userData.driver_profile.work_permit_url && userData.driver_profile.work_permit_url.trim() !== '' ? userData.driver_profile.work_permit_url : null,
         userData.driver_profile.employment_status || 'inactive'
       ]);
     }

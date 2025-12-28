@@ -32,10 +32,17 @@ export default function AdminDashboard() {
       color: 'bg-green-500'
     },
     {
+      title: 'Driver Management',
+      description: 'View and edit existing drivers',
+      icon: Car,
+      path: '/admin/drivers/manage',
+      color: 'bg-orange-500'
+    },
+    {
       title: 'Bookings',
       description: 'View and manage all taxi bookings',
       icon: Calendar,
-      path: '/admin/bookings',
+      path: '/bookings',
       color: 'bg-purple-500'
     },
     {
@@ -84,6 +91,10 @@ export default function AdminDashboard() {
               <Button variant="outline" onClick={() => navigate('/admin/drivers')}>
                 <Plus className="h-4 w-4 mr-2" />
                 Register Driver
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/admin/drivers/manage')}>
+                <Car className="h-4 w-4 mr-2" />
+                Manage Drivers
               </Button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getCurrentUser, selectIsAuthenticated, selectIsLoading, selectUser, clearAuth } from '../store/auth';
@@ -23,13 +23,31 @@ export function ProtectedRoute({
   const isLoading = useSelector(selectIsLoading);
   const user = useSelector(selectUser);
   const token = localStorage.getItem('token');
+  const hasAttemptedAuth = useRef(false);
 
   // Check authentication and get user info if token exists but no user data
   useEffect(() => {
-    if (token && !user && !isLoading) {
+    if (token && !user && !isLoading && !hasAttemptedAuth.current) {
+      hasAttemptedAuth.current = true;
+      
+      // Add timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        console.log('Auth check timeout - clearing auth and redirecting');
+        dispatch(clearAuth());
+        navigate(fallbackPath, { 
+          state: { from: location.pathname },
+          replace: true 
+        });
+      }, 5000); // 5 second timeout
+
       dispatch(getCurrentUser())
         .unwrap()
+        .then(() => {
+          clearTimeout(timeoutId);
+        })
         .catch((error) => {
+          clearTimeout(timeoutId);
+          console.log('Auth check failed:', error);
           // If getting user fails, clear auth and redirect to login
           dispatch(clearAuth());
           navigate(fallbackPath, { 
@@ -38,7 +56,14 @@ export function ProtectedRoute({
           });
         });
     }
-  }, [token, user, isLoading, dispatch, navigate, fallbackPath, location.pathname]);
+  }, [token, user, isLoading]); // Remove dispatch, navigate, fallbackPath, location.pathname to prevent infinite loops
+
+  // Reset auth attempt ref when token changes
+  useEffect(() => {
+    if (!token) {
+      hasAttemptedAuth.current = false;
+    }
+  }, [token]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -74,8 +99,8 @@ export function ProtectedRoute({
     }
   }, [isAuthenticated, user, requiredRole, navigate]);
 
-  // Show loading spinner while checking authentication
-  if (isLoading || (token && !user)) {
+  // Show loading spinner while checking authentication (but not if we've already attempted auth)
+  if (isLoading || (token && !user && !hasAttemptedAuth.current)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -88,6 +113,25 @@ export function ProtectedRoute({
 
   // Don't render children if not authenticated or if role check fails
   if (!isAuthenticated || !user) {
+    // If we have a token but no user after auth attempt, show error or redirect
+    if (token && hasAttemptedAuth.current) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Authentication failed</p>
+            <button 
+              onClick={() => {
+                dispatch(clearAuth());
+                navigate('/login', { replace: true });
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+      );
+    }
     return null;
   }
 

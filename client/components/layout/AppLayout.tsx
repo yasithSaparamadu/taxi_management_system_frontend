@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Calendar, Car, Users, UserCog2, Receipt, BarChart3, ClipboardList, LayoutDashboard, Menu, X } from "lucide-react";
+import { Calendar, Car, Users, Receipt, BarChart3, ClipboardList, LayoutDashboard, Menu, X } from "lucide-react";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/bookings", label: "Bookings", icon: ClipboardList },
   { to: "/calendar", label: "Calendar", icon: Calendar },
   { to: "/vehicles", label: "Vehicles", icon: Car },
-  { to: "/drivers", label: "Drivers", icon: UserCog2 },
   { to: "/customers", label: "Customers", icon: Users },
   { to: "/invoices", label: "Invoices", icon: Receipt },
   { to: "/reports", label: "Reports", icon: BarChart3 },

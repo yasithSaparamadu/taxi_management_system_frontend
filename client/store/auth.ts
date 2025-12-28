@@ -69,6 +69,7 @@ export const getCurrentUser = createAsyncThunk(
   'auth/getCurrentUser',
   async (_, { rejectWithValue }) => {
     try {
+      console.log('getCurrentUser called');
       const response = await fetch('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -279,9 +280,10 @@ const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(getCurrentUser.fulfilled, (state, action: PayloadAction<MeResponse>) => {
+      .addCase(getCurrentUser.fulfilled, (state, action: PayloadAction<any>) => {
         state.isLoading = false;
-        state.user = action.payload.user || null;
+        state.user = action.payload.user || action.payload || null;
+        state.isAuthenticated = !!state.user;
         state.error = null;
       })
       .addCase(getCurrentUser.rejected, (state, action) => {

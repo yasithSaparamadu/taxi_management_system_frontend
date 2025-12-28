@@ -23,11 +23,12 @@ const updateUserSchema = z.object({
     last_name: z.string().min(1).max(100).optional(),
     phone: z.string().max(20).optional(),
     address: z.string().max(500).optional(),
+    profile_image_url: z.string().optional().or(z.literal('')),
   }).optional(),
   driver_profile: z.object({
     license_number: z.string().min(1).max(50).optional(),
-    id_proof_url: z.string().url().optional(),
-    work_permit_url: z.string().url().optional(),
+    id_proof_url: z.string().optional().or(z.literal('')),
+    work_permit_url: z.string().optional().or(z.literal('')),
     employment_status: z.enum(['active', 'inactive', 'suspended']).optional(),
   }).optional(),
 });
@@ -42,11 +43,12 @@ const createUserSchema = z.object({
     last_name: z.string().min(1).max(100),
     phone: z.string().max(20).optional(),
     address: z.string().max(500).optional(),
+    profile_image_url: z.string().optional().or(z.literal('')),
   }),
   driver_profile: z.object({
     license_number: z.string().min(1).max(50),
-    id_proof_url: z.string().url().optional(),
-    work_permit_url: z.string().url().optional(),
+    id_proof_url: z.string().optional().or(z.literal('')),
+    work_permit_url: z.string().optional().or(z.literal('')),
     employment_status: z.enum(['active', 'inactive', 'suspended']).optional(),
   }).optional(),
 });
@@ -92,12 +94,14 @@ export const handleListUsers: RequestHandler = async (req, res) => {
     // Get users with pagination
     const usersQuery = `
       SELECT 
-        u.id, u.email, u.role, u.status, u.created_at, u.updated_at,
-        p.first_name, p.last_name, p.phone, p.address,
-        dp.license_number, dp.license_expiry, dp.vehicle_type, 
-        dp.employment_status, dp.hire_date
+        u.id, u.email, u.role, u.status, u.created_at, u.updated_at, u.phone,
+        p.first_name, p.last_name, p.address, p.profile_image_url,
+        dp.license_number, 
+        dp.employment_status,
+        dp.id_proof_url,
+        dp.work_permit_url
       FROM users u 
-      LEFT JOIN profiles p ON u.id = p.user_id 
+      LEFT JOIN profiles p ON u.id = p.user_id
       LEFT JOIN driver_profiles dp ON u.id = dp.user_id 
       ${whereClause}
       ORDER BY u.created_at DESC 
@@ -112,20 +116,20 @@ export const handleListUsers: RequestHandler = async (req, res) => {
       email: user.email,
       role: user.role,
       status: user.status,
+      phone: user.phone,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      profile: user.first_name || user.last_name || user.phone || user.address ? {
+      profile: user.first_name || user.last_name || user.address || user.profile_image_url ? {
         first_name: user.first_name,
         last_name: user.last_name,
-        phone: user.phone,
         address: user.address,
+        profile_image_url: user.profile_image_url,
       } : undefined,
-      driver_profile: user.license_number || user.license_expiry || user.vehicle_type ? {
+      driver_profile: user.license_number || user.employment_status || user.id_proof_url || user.work_permit_url ? {
         license_number: user.license_number,
-        license_expiry: user.license_expiry,
-        vehicle_type: user.vehicle_type,
         employment_status: user.employment_status,
-        hire_date: user.hire_date,
+        id_proof_url: user.id_proof_url,
+        work_permit_url: user.work_permit_url,
       } : undefined,
     }));
 
@@ -151,10 +155,12 @@ export const handleGetUser: RequestHandler = async (req, res) => {
 
     const query = `
       SELECT 
-        u.id, u.email, u.role, u.status, u.created_at, u.updated_at,
-        p.first_name, p.last_name, p.phone, p.address,
-        dp.license_number, dp.license_expiry, dp.vehicle_type, 
-        dp.employment_status, dp.hire_date
+        u.id, u.email, u.role, u.status, u.created_at, u.updated_at, u.phone,
+        p.first_name, p.last_name, p.address, p.profile_image_url,
+        dp.license_number, 
+        dp.employment_status,
+        dp.id_proof_url,
+        dp.work_permit_url
       FROM users u 
       LEFT JOIN profiles p ON u.id = p.user_id 
       LEFT JOIN driver_profiles dp ON u.id = dp.user_id 
@@ -174,21 +180,21 @@ export const handleGetUser: RequestHandler = async (req, res) => {
       email: user.email,
       role: user.role,
       status: user.status,
+      phone: user.phone,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      profile: user.first_name || user.last_name || user.phone || user.address ? {
+      profile: {
         first_name: user.first_name,
         last_name: user.last_name,
-        phone: user.phone,
         address: user.address,
-      } : undefined,
-      driver_profile: user.license_number || user.license_expiry || user.vehicle_type ? {
+        profile_image_url: user.profile_image_url,
+      },
+      driver_profile: {
         license_number: user.license_number,
-        license_expiry: user.license_expiry,
-        vehicle_type: user.vehicle_type,
         employment_status: user.employment_status,
-        hire_date: user.hire_date,
-      } : undefined,
+        id_proof_url: user.id_proof_url,
+        work_permit_url: user.work_permit_url,
+      },
     };
 
     res.json({ user: formattedUser });
@@ -219,7 +225,7 @@ export const handleCreateUser: RequestHandler = async (req, res) => {
     });
     
     // Get the created user to return full details
-    const createdUser = await AuthService.findUserById(userId);
+    const createdUser = await AuthService.findUserById(userId.toString());
     
     res.status(201).json({
       message: 'User created successfully',

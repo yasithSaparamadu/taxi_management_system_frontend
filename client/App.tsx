@@ -13,7 +13,6 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Bookings from "./pages/Bookings";
 import Vehicles from "./pages/Vehicles";
-import Drivers from "./pages/Drivers";
 import Customers from "./pages/Customers";
 import Invoices from "./pages/Invoices";
 import Reports from "./pages/Reports";
@@ -24,6 +23,7 @@ import DashboardSelection from "./pages/DashboardSelection";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUserRegistration from "./pages/AdminUserRegistration";
 import AdminDriverRegistration from "./pages/AdminDriverRegistration";
+import AdminDriverManagement from "./pages/AdminDriverManagement";
 import DriverDashboard from "./pages/DriverDashboard";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import { ProtectedRoute, AdminRoute, DriverRoute, CustomerRoute } from "./components/ProtectedRoute";
@@ -42,7 +42,6 @@ const App = () => (
               <Route path="/" element={<AdminRoute><DashboardSelection /></AdminRoute>} />
               <Route path="/bookings" element={<AdminRoute><Bookings /></AdminRoute>} />
               <Route path="/vehicles" element={<AdminRoute><Vehicles /></AdminRoute>} />
-              <Route path="/drivers" element={<AdminRoute><Drivers /></AdminRoute>} />
               <Route path="/customers" element={<AdminRoute><Customers /></AdminRoute>} />
               <Route path="/invoices" element={<AdminRoute><Invoices /></AdminRoute>} />
               <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
@@ -54,6 +53,7 @@ const App = () => (
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/admin/users" element={<AdminRoute><AdminUserRegistration /></AdminRoute>} />
             <Route path="/admin/drivers" element={<AdminRoute><AdminDriverRegistration /></AdminRoute>} />
+            <Route path="/admin/drivers/manage" element={<AdminRoute><AdminDriverManagement /></AdminRoute>} />
             <Route path="/driver" element={<DriverRoute><DriverDashboard /></DriverRoute>} />
             <Route path="/customer" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
             <Route path="*" element={<NotFound />} />

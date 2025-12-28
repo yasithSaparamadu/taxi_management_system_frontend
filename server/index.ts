@@ -4,7 +4,6 @@ import cors from "cors";
 import { handleDemo } from "./routes/demo";
 import { handleDbPing } from "./routes/db-ping";
 import { handleCreateCustomer } from "./routes/customers";
-import { handleCreateDriver } from "./routes/drivers";
 import { 
   createBooking,
   confirmBooking,
@@ -40,6 +39,11 @@ import {
   handleGetUserStats
 } from "./routes/users";
 import { authenticate, authorize } from "./middleware/auth";
+import { 
+  handleDriverDocumentUpload,
+  handleDriverDocumentUploadInfo,
+  serveUploadedFile
+} from "./routes/upload";
 
 export function createServer() {
   const app = express();
@@ -48,6 +52,9 @@ export function createServer() {
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+
+  // Serve uploaded files
+  app.use('/uploads', express.static('uploads'));
 
   // Example API routes
   app.get("/api/ping", (_, res) => res.json({ status: "ok" }));
@@ -71,8 +78,9 @@ export function createServer() {
   // Customer routes (admin only for now)
   app.post("/api/customers", authenticate, authorize(['admin']), handleCreateCustomer);
 
-  // Driver routes (admin only for now)
-  app.post("/api/drivers", authenticate, authorize(['admin']), handleCreateDriver);
+  // File upload routes
+  app.post("/api/upload/driver-documents", authenticate, authorize(['admin']), handleDriverDocumentUpload, handleDriverDocumentUploadInfo);
+  app.get("/uploads/documents/:filename", serveUploadedFile);
 
   // Booking routes
   app.post("/api/bookings", authenticate, createBooking);

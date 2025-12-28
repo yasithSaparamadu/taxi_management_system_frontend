@@ -47,14 +47,17 @@ export default function AdminUserRegistration() {
     setError('');
     setSuccess('');
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+    // Only validate password for admin role
+    if (formData.role === 'admin') {
+      if (formData.password !== formData.confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      return;
+      if (formData.password.length < 6) {
+        setError('Password must be at least 6 characters long');
+        return;
+      }
     }
 
     setLoading(true);
@@ -62,10 +65,13 @@ export default function AdminUserRegistration() {
     try {
       const token = localStorage.getItem('token');
       
+      // Set default password for non-admin roles
+      const password = formData.role === 'admin' ? formData.password : 'defaultPassword123';
+      
       // Debug: Log the data being sent
       console.log('Sending user data:', {
         email: formData.email,
-        password: formData.password,
+        password: password,
         role: formData.role,
         phone: formData.phone,
         profile: {
@@ -83,7 +89,7 @@ export default function AdminUserRegistration() {
         },
         body: JSON.stringify({
           email: formData.email,
-          password: formData.password,
+          password: password,
           role: formData.role,
           phone: formData.phone,
           profile: {
@@ -215,39 +221,49 @@ export default function AdminUserRegistration() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="password">Password</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input
-                            id="password"
-                            type="password"
-                            placeholder="Enter password"
-                            value={formData.password}
-                            onChange={(e) => handleInputChange('password', e.target.value)}
-                            className="pl-10"
-                            required
-                          />
+                    {/* Password fields only for admin role */}
+                    {formData.role === 'admin' ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="password">Password</Label>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                            <Input
+                              id="password"
+                              type="password"
+                              placeholder="Enter password"
+                              value={formData.password}
+                              onChange={(e) => handleInputChange('password', e.target.value)}
+                              className="pl-10"
+                              required
+                            />
+                          </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <Label htmlFor="confirmPassword">Confirm Password</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input
-                            id="confirmPassword"
-                            type="password"
-                            placeholder="Confirm password"
-                            value={formData.confirmPassword}
-                            onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                            className="pl-10"
-                            required
-                          />
+                        <div>
+                          <Label htmlFor="confirmPassword">Confirm Password</Label>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                            <Input
+                              id="confirmPassword"
+                              type="password"
+                              placeholder="Confirm password"
+                              value={formData.confirmPassword}
+                              onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                              className="pl-10"
+                              required
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <p className="text-sm text-blue-800">
+                          <strong>Note:</strong> A default password will be automatically generated for this {formData.role}. 
+                          They can change it after first login.
+                        </p>
+                      </div>
+                    )}
 
                     <div>
                       <Label htmlFor="phone">Phone Number</Label>
