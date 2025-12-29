@@ -93,6 +93,7 @@ export interface Booking {
   status: BookingStatus;
   admin_note?: string | null;
   driver_id?: number | null;
+  vehicle_id?: number | null;
   confirmed_at?: string | null;
   assigned_at?: string | null;
   outlook_event_id?: string | null;
@@ -117,6 +118,8 @@ export interface CreateBookingRequest {
   admin_note?: string;
   created_by_name?: string;
   driver_id?: number | null;
+  customer_id?: number; // Add customer_id field
+  vehicle_id?: number | null; // Add vehicle_id field
 }
 
 export interface CreateBookingResponse { ok: boolean; id?: number; error?: string }
@@ -133,6 +136,8 @@ export interface UpdateBookingRequest {
   estimated_price_cents?: number | null;
   status?: BookingStatus; // allow downgrade/cancel
   admin_note?: string; // admin-only
+  driver_id?: number | null;
+  vehicle_id?: number | null;
 }
 export interface UpdateBookingResponse { ok: boolean; error?: string }
 

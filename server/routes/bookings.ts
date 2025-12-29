@@ -45,6 +45,8 @@ const CreateSchema = z.object({
   admin_note: z.string().max(5000).optional(),
   created_by_name: z.string().max(150).optional(),
   driver_id: z.coerce.number().int().positive().nullable().optional(),
+  customer_id: z.coerce.number().int().positive().nullable().optional(),
+  vehicle_id: z.coerce.number().int().positive().nullable().optional(),
 });
 
 export const createBooking: RequestHandler = async (req, res) => {
@@ -61,32 +63,73 @@ export const createBooking: RequestHandler = async (req, res) => {
     }
     const b = parsed.data;
 
-    const [result] = await pool.execute<import('mysql2/promise').ResultSetHeader>(
-      `INSERT INTO bookings (
-        service_id, source, created_by_role, created_by_name,
-        staff_id, pickup_point, dropoff_point, special_instructions,
-        contact_name, contact_phone, contact_email,
-        start_time, end_time, estimated_price_cents, status, admin_note, driver_id
-      ) VALUES (?, ?, ?, NULLIF(?, ''), NULL, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
-        NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, 'scheduled', NULLIF(?, ''), ?)`,
-      [
-        b.service_id,
-        b.source,
-        'admin', // Default to admin role for JWT auth
-        b.created_by_name ?? '',
-        b.pickup_point ?? '',
-        b.dropoff_point ?? '',
-        b.special_instructions ?? '',
-        b.contact_name ?? '',
-        b.contact_phone ?? '',
-        b.contact_email ?? '',
-        b.start_time.replace('T', ' '),
-        b.end_time.replace('T', ' '),
-        b.estimated_price_cents ?? null,
-        b.admin_note ?? '',
-        b.driver_id ?? null,
-      ]
-    );
+    // Verify driver exists if provided
+    if (b.driver_id) {
+      const [driverCheck] = await pool.execute(
+        'SELECT id FROM users WHERE id = ? AND role = "driver" AND status = "active"',
+        [b.driver_id]
+      );
+      if (!(driverCheck as any[]).length) {
+        return res.status(400).json({ ok: false, error: 'Invalid driver_id - driver not found or inactive' } as CreateBookingResponse);
+      }
+    }
+
+    // Verify vehicle exists if provided
+    if (b.vehicle_id) {
+      const [vehicleCheck] = await pool.execute(
+        'SELECT id FROM vehicles WHERE id = ? AND status = "active"',
+        [b.vehicle_id]
+      );
+      if (!(vehicleCheck as any[]).length) {
+        return res.status(400).json({ ok: false, error: 'Invalid vehicle_id - vehicle not found or inactive' } as CreateBookingResponse);
+      }
+    }
+
+  const [result] = await pool.execute<import('mysql2/promise').ResultSetHeader>(
+  `INSERT INTO bookings (
+    service_id, source, created_by_role, created_by_name,
+    staff_id, pickup_point, dropoff_point, special_instructions,
+    contact_name, contact_phone, contact_email,
+    start_time, end_time, estimated_price_cents,
+    status, admin_note, driver_id, customer_id, vehicle_id
+  ) VALUES (
+    ?, ?, ?, NULLIF(?, ''),           -- created_by_name
+    ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), 
+    NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), 
+    ?, ?, ?,                          -- start/end/price
+    ?, NULLIF(?, ''),                 -- status / admin_note
+    ?, ?, ?                           -- driver, customer, vehicle
+  )`,
+  [
+    b.service_id,
+    b.source,
+    'admin',
+    b.created_by_name ?? '',
+
+    null, // staff_id
+
+    b.pickup_point ?? '',
+    b.dropoff_point ?? '',
+    b.special_instructions ?? '',
+
+    b.contact_name ?? '',
+    b.contact_phone ?? '',
+    b.contact_email ?? '',
+
+    b.start_time.replace('T', ' '),
+    b.end_time.replace('T', ' '),
+
+    b.estimated_price_cents ?? null,
+
+    'scheduled',
+    b.admin_note ?? '',
+
+    b.driver_id ?? null,
+    b.customer_id ?? null,
+    b.vehicle_id ?? null
+  ]
+);
+
 
     // Audit
     await pool.execute(
@@ -209,6 +252,17 @@ export const confirmBooking: RequestHandler = async (req, res) => {
     }
     const d = parsed.data;
 
+    // Verify driver exists if provided
+    if (d.driver_id) {
+      const [driverCheck] = await pool.execute(
+        'SELECT id FROM users WHERE id = ? AND role = "driver" AND status = "active"',
+        [d.driver_id]
+      );
+      if (!(driverCheck as any[]).length) {
+        return res.status(400).json({ ok: false, error: 'Invalid driver_id - driver not found or inactive' } as ConfirmBookingResponse);
+      }
+    }
+
     // Generate a customer verification token if not exists
     const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     await pool.execute(
@@ -251,7 +305,10 @@ export const confirmBooking: RequestHandler = async (req, res) => {
     if (d.driver_id || row?.driver_id) {
       const driverId = d.driver_id ?? row.driver_id;
       const [drows] = await pool.query<any[]>(
-        `SELECT email, first_name, last_name FROM drivers WHERE id=? LIMIT 1`,
+        `SELECT u.email, p.first_name, p.last_name 
+         FROM users u 
+         LEFT JOIN profiles p ON u.id = p.user_id 
+         WHERE u.id=? AND u.role='driver' LIMIT 1`,
         [driverId]
       );
       const drow = Array.isArray(drows) ? drows[0] : undefined;
@@ -283,6 +340,8 @@ const UpdateSchema = z.object({
   estimated_price_cents: z.union([z.coerce.number().int().min(0), z.null()]).optional(),
   status: z.enum(['scheduled','confirmed','completed','cancelled','no_show']).optional(),
   admin_note: z.string().max(5000).optional(),
+  driver_id: z.coerce.number().int().positive().nullable().optional(),
+  vehicle_id: z.coerce.number().int().positive().nullable().optional(),
 });
 
 export const updateBooking: RequestHandler = async (req, res) => {
@@ -300,6 +359,28 @@ export const updateBooking: RequestHandler = async (req, res) => {
     }
     const b = parsed.data;
 
+    // Verify driver exists if provided
+    if (b.driver_id !== undefined && b.driver_id !== null) {
+      const [driverCheck] = await pool.execute(
+        'SELECT id FROM users WHERE id = ? AND role = "driver" AND status = "active"',
+        [b.driver_id]
+      );
+      if (!(driverCheck as any[]).length) {
+        return res.status(400).json({ ok: false, error: 'Invalid driver_id - driver not found or inactive' } as UpdateBookingResponse);
+      }
+    }
+
+    // Verify vehicle exists if provided
+    if (b.vehicle_id !== undefined && b.vehicle_id !== null) {
+      const [vehicleCheck] = await pool.execute(
+        'SELECT id FROM vehicles WHERE id = ? AND status = "active"',
+        [b.vehicle_id]
+      );
+      if (!(vehicleCheck as any[]).length) {
+        return res.status(400).json({ ok: false, error: 'Invalid vehicle_id - vehicle not found or inactive' } as UpdateBookingResponse);
+      }
+    }
+
     // Build dynamic update
     const fields: string[] = [];
     const vals: any[] = [];
@@ -309,6 +390,8 @@ export const updateBooking: RequestHandler = async (req, res) => {
     if (b.estimated_price_cents !== undefined) { fields.push('estimated_price_cents=?'); vals.push(b.estimated_price_cents); }
     if (b.status !== undefined) { fields.push('status=?'); vals.push(b.status); }
     if (b.admin_note !== undefined) { fields.push('admin_note=NULLIF(?, "")'); vals.push(b.admin_note ?? ''); }
+    if (b.driver_id !== undefined) { fields.push('driver_id=?'); vals.push(b.driver_id); }
+    if (b.vehicle_id !== undefined) { fields.push('vehicle_id=?'); vals.push(b.vehicle_id); }
 
     if (fields.length === 0) {
       return res.json({ ok: true } as UpdateBookingResponse);
@@ -331,9 +414,10 @@ export const updateBooking: RequestHandler = async (req, res) => {
     try {
       const [rows] = await pool.query<any[]>(
         `SELECT b.contact_email, b.pickup_point, b.dropoff_point, b.start_time, b.end_time, b.driver_id,
-                d.email as driver_email, d.first_name as df, d.last_name as dl
+                u.email as driver_email, p.first_name as df, p.last_name as dl
          FROM bookings b
-         LEFT JOIN drivers d ON d.id = b.driver_id
+         LEFT JOIN users u ON u.id = b.driver_id AND u.role = 'driver'
+         LEFT JOIN profiles p ON u.id = p.user_id
          WHERE b.id=?`,
         [id]
       );
@@ -402,19 +486,25 @@ export const listBookings: RequestHandler = async (req, res) => {
         b.id,
         b.service_id,
         b.source,
+        b.created_by_role,
+        b.created_by_name,
         b.start_time,
         b.end_time,
         b.pickup_point,
         b.dropoff_point,
+        b.special_instructions,
         b.estimated_price_cents,
         b.status,
         b.admin_note,
         b.driver_id,
+        b.vehicle_id,
+        b.customer_id,
+        b.contact_name,
+        b.contact_phone,
+        b.contact_email,
         b.confirmed_at,
         b.assigned_at,
         b.outlook_event_id,
-        b.customer_verify_token,
-        b.admin_approve_token,
         b.created_at,
         b.updated_at
       FROM bookings b 
@@ -424,8 +514,14 @@ export const listBookings: RequestHandler = async (req, res) => {
 
     const [bookings] = await pool.execute(query, params) as [any[], any];
 
+    const toIsoOrNull = (v: any) => (v ? new Date(v).toISOString() : null);
+
     const items = bookings.map((b: any) => ({
       ...b,
+      start_time: new Date(b.start_time).toISOString(),
+      end_time: new Date(b.end_time).toISOString(),
+      confirmed_at: toIsoOrNull(b.confirmed_at),
+      assigned_at: toIsoOrNull(b.assigned_at),
       created_at: new Date(b.created_at).toISOString(),
       updated_at: new Date(b.updated_at).toISOString(),
     }));

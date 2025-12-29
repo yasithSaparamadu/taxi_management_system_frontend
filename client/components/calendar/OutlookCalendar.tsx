@@ -29,7 +29,8 @@ const OutlookCalendar: React.FC<{
   events?: CalendarEvent[];
   initialDate?: Date;
   initialView?: ViewType;
-}> = ({ events = [], initialDate = new Date(), initialView = "month" }) => {
+  onRefresh?: () => void;
+}> = ({ events = [], initialDate = new Date(), initialView = "day", onRefresh }) => {
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [viewType, setViewType] = useState<ViewType>(initialView);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -101,6 +102,11 @@ const OutlookCalendar: React.FC<{
 
   // Get event color
   const getEventColor = (event: CalendarEvent) => {
+    // Use custom color if provided
+    if (event.color) {
+      return "";
+    }
+    
     switch (event.type) {
       case "booking":
         return "bg-blue-500";
@@ -111,6 +117,17 @@ const OutlookCalendar: React.FC<{
       default:
         return "bg-gray-500";
     }
+  };
+
+  // Get event style with custom color
+  const getEventStyle = (event: CalendarEvent) => {
+    if (event.color) {
+      return {
+        backgroundColor: event.color,
+        borderColor: event.color,
+      };
+    }
+    return {};
   };
 
   // Render month view
@@ -160,10 +177,13 @@ const OutlookCalendar: React.FC<{
                       key={event.id}
                       className="flex items-center"
                     >
-                      <div className={cn(
-                        "w-2 h-2 rounded-full mr-1",
-                        getEventColor(event)
-                      )} />
+                      <div 
+                        className={cn(
+                          "w-2 h-2 rounded-full mr-1",
+                          getEventColor(event)
+                        )}
+                        style={getEventStyle(event)}
+                      />
                       <div className="text-xs truncate text-gray-700">
                         {event.title}
                       </div>
@@ -230,9 +250,16 @@ const OutlookCalendar: React.FC<{
                           "text-xs p-1 rounded border mb-1",
                           getEventColor(event)
                         )}
+                        style={getEventStyle(event)}
                       >
                         <div className="font-medium">{event.title}</div>
                         <div className="text-xs opacity-75">{event.startTime} - {event.endTime}</div>
+                        {event.customer && (
+                          <div className="text-xs opacity-75">Customer: {event.customer}</div>
+                        )}
+                        {event.location && (
+                          <div className="text-xs opacity-75">📍 {event.location}</div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -272,6 +299,7 @@ const OutlookCalendar: React.FC<{
                         "p-2 rounded border mb-2",
                         getEventColor(event)
                       )}
+                      style={getEventStyle(event)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="font-medium">{event.title}</div>
@@ -283,16 +311,16 @@ const OutlookCalendar: React.FC<{
                         {event.startTime} - {event.endTime}
                       </div>
                       {event.customer && (
-                        <div className="text-sm opacity-75">
-                          <Users className="inline w-3 h-3 mr-1" />
-                          {event.customer}
-                        </div>
+                        <div className="text-sm opacity-75 mt-1">Customer: {event.customer}</div>
+                      )}
+                      {event.driver && (
+                        <div className="text-sm opacity-75 mt-1">👤 {event.driver}</div>
                       )}
                       {event.location && (
-                        <div className="text-sm opacity-75">
-                          <MapPin className="inline w-3 h-3 mr-1" />
-                          {event.location}
-                        </div>
+                        <div className="text-sm opacity-75 mt-1">📍 {event.location}</div>
+                      )}
+                      {event.description && (
+                        <div className="text-sm opacity-75 mt-1">{event.description}</div>
                       )}
                     </div>
                   ))}
@@ -326,7 +354,8 @@ const OutlookCalendar: React.FC<{
                 <div key={event.id} className="p-4 hover:bg-gray-50">
                   <div className="flex items-start space-x-3">
                     <div className="flex-shrink-0">
-                      <div className={cn("w-3 h-3 rounded-full", getEventColor(event))} />
+                      <div className={cn("w-3 h-3 rounded-full", getEventColor(event))} 
+                         style={getEventStyle(event)} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -393,6 +422,15 @@ const OutlookCalendar: React.FC<{
           </div>
 
           <div className="flex items-center space-x-3">
+            {/* Refresh button */}
+            {onRefresh && (
+              <Button variant="ghost" size="sm" onClick={onRefresh} title="Refresh bookings">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </Button>
+            )}
+            
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
