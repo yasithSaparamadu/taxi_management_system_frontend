@@ -152,6 +152,7 @@ export interface Vehicle {
   vin?: string | null;
   capacity?: number | null; // seats
   status: 'active' | 'inactive';
+  image_url?: string | null; // vehicle image URL
   partner_id?: number | null; // null for in-house
   created_at: string; // ISO
   updated_at: string; // ISO

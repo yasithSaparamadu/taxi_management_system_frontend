@@ -52,15 +52,6 @@ export default function DashboardSelection() {
       features: ['Booking Calendar', 'Schedule Management', 'Booking Analytics', 'Customer Communications']
     },
     {
-      id: 'vehicles',
-      title: 'Vehicle Dashboard',
-      description: 'Fleet management and vehicle tracking',
-      path: '/vehicles',
-      icon: Car,
-      badge: 'Fleet',
-      features: ['Vehicle Tracking', 'Maintenance Schedule', 'Fuel Management', 'Insurance Management']
-    },
-    {
       id: 'reports',
       title: 'Reports Dashboard',
       description: 'Analytics, financial reports, and business insights',
@@ -69,15 +60,7 @@ export default function DashboardSelection() {
       badge: 'Analytics',
       features: ['Financial Reports', 'Revenue Analytics', 'Performance Metrics', 'Custom Reports']
     },
-    {
-      id: 'users',
-      title: 'User Management Dashboard',
-      description: 'Comprehensive user and driver management',
-      path: '/admin/users',
-      icon: UserCheck,
-      badge: 'HR',
-      features: ['User Registration', 'Driver Management', 'Profile Management', 'Access Control']
-    }
+   
   ];
 
   const handleDashboardSelect = (dashboard: DashboardOption) => {
@@ -93,7 +76,6 @@ export default function DashboardSelection() {
       case 'Primary': return 'bg-blue-100 text-blue-800';
       case 'Admin': return 'bg-purple-100 text-purple-800';
       case 'Operations': return 'bg-green-100 text-green-800';
-      case 'Fleet': return 'bg-orange-100 text-orange-800';
       case 'Analytics': return 'bg-indigo-100 text-indigo-800';
       case 'HR': return 'bg-pink-100 text-pink-800';
       default: return 'bg-gray-100 text-gray-800';

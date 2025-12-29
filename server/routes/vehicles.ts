@@ -191,6 +191,7 @@ const CreateVehicleSchema = z.object({
   vin: z.string().max(100).optional().or(z.literal("")),
   capacity: z.coerce.number().int().min(1).max(100).optional(),
   status: z.enum(["active","inactive"]).optional().default("active"),
+  image_url: z.string().optional(),
 });
 
 export const createVehicle: RequestHandler = async (req, res) => {
@@ -202,9 +203,9 @@ export const createVehicle: RequestHandler = async (req, res) => {
     }
     const v = parsed.data;
     const [result] = await pool.execute<import("mysql2/promise").ResultSetHeader>(
-      `INSERT INTO vehicles (name, make, model, year, color, plate, vin, capacity, status)
-       VALUES (?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?)`,
-      [v.name, v.make ?? "", v.model ?? "", v.year ?? null, v.color ?? "", v.plate ?? "", v.vin ?? "", v.capacity ?? null, v.status ?? "active"]
+      `INSERT INTO vehicles (name, make, model, year, color, plate, vin, capacity, status, image_url)
+       VALUES (?, NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?)`,
+      [v.name, v.make ?? "", v.model ?? "", v.year ?? null, v.color ?? "", v.plate ?? "", v.vin ?? "", v.capacity ?? null, v.status ?? "active", v.image_url ?? null]
     );
     return res.json({ ok: true, id: result.insertId } as CreateVehicleResponse);
   } catch (err: any) {
@@ -383,5 +384,120 @@ export const addFuelLog: RequestHandler = async (req, res) => {
     return res.json({ ok: true, id: result.insertId } as AddFuelLogResponse);
   } catch (err: any) {
     return res.status(500).json({ ok: false, error: err?.message ?? "Server error" } as AddFuelLogResponse);
+  }
+};
+
+// Update vehicle
+export const updateVehicle: RequestHandler = async (req, res) => {
+  try {
+    if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: "Admin only" });
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ ok: false, error: "Invalid vehicle id" });
+    
+    const parsed = CreateVehicleSchema.safeParse(req.body as CreateVehicleRequest);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    }
+    
+    const v = parsed.data;
+    const image_url = (req.body as any).image_url || null;
+    
+    const [result] = await pool.execute<import("mysql2/promise").ResultSetHeader>(
+      `UPDATE vehicles 
+       SET name = ?, make = NULLIF(?, ''), model = NULLIF(?, ''), year = ?, 
+           color = NULLIF(?, ''), plate = NULLIF(?, ''), vin = NULLIF(?, ''), 
+           capacity = ?, status = ?, image_url = ?
+       WHERE id = ?`,
+      [v.name, v.make ?? "", v.model ?? "", v.year ?? null, v.color ?? "", v.plate ?? "", v.vin ?? "", v.capacity ?? null, v.status ?? "active", image_url, id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ ok: false, error: "Vehicle not found" });
+    }
+    
+    return res.json({ ok: true, message: "Vehicle updated successfully" });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err?.message ?? "Server error" });
+  }
+};
+
+// Delete vehicle
+export const deleteVehicle: RequestHandler = async (req, res) => {
+  try {
+    if (!requireAdmin(req)) return res.status(401).json({ ok: false, error: "Admin only" });
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ ok: false, error: "Invalid vehicle id" });
+    
+    // Check if vehicle has bookings
+    const [bookings] = await pool.query<any[]>(
+      'SELECT id FROM bookings WHERE vehicle_id = ? LIMIT 1',
+      [id]
+    );
+    
+    if (Array.isArray(bookings) && bookings.length > 0) {
+      return res.status(400).json({ ok: false, error: "Cannot delete vehicle with existing bookings" });
+    }
+    
+    const [result] = await pool.execute<import("mysql2/promise").ResultSetHeader>(
+      'DELETE FROM vehicles WHERE id = ?',
+      [id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ ok: false, error: "Vehicle not found" });
+    }
+    
+    return res.json({ ok: true, message: "Vehicle deleted successfully" });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err?.message ?? "Server error" });
+  }
+};
+
+// Get single vehicle
+export const getVehicle: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ ok: false, error: "Invalid vehicle id" });
+    
+    const [rows] = await pool.query<any[]>(
+      'SELECT * FROM vehicles WHERE id = ?',
+      [id]
+    );
+    
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Vehicle not found" });
+    }
+    
+    const vehicle = {
+      ...rows[0],
+      created_at: new Date(rows[0].created_at).toISOString(),
+      updated_at: new Date(rows[0].updated_at).toISOString(),
+    };
+    
+    return res.json({ ok: true, vehicle });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err?.message ?? "Server error" });
+  }
+};
+
+// Get vehicle documents
+export const getVehicleDocuments: RequestHandler = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ ok: false, error: "Invalid vehicle id" });
+    
+    const [rows] = await pool.query<any[]>(
+      'SELECT * FROM vehicle_documents WHERE vehicle_id = ? ORDER BY created_at DESC',
+      [id]
+    );
+    
+    const documents = rows.map(doc => ({
+      ...doc,
+      created_at: new Date(doc.created_at).toISOString(),
+    }));
+    
+    return res.json({ ok: true, documents });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err?.message ?? "Server error" });
   }
 };

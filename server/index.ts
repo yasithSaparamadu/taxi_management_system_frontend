@@ -14,6 +14,10 @@ import {
   searchVehicles,
   createVehicle,
   listVehicles,
+  updateVehicle,
+  deleteVehicle,
+  getVehicle,
+  getVehicleDocuments,
   addVehicleDocument,
   addMaintenance,
   addMileage,
@@ -41,6 +45,8 @@ import { authenticate, authorize } from "./middleware/auth";
 import { 
   handleDriverDocumentUpload,
   handleDriverDocumentUploadInfo,
+  handleVehicleDocumentUpload,
+  handleVehicleDocumentUploadInfo,
   serveUploadedFile
 } from "./routes/upload";
 
@@ -54,6 +60,10 @@ export function createServer() {
 
   // Serve uploaded files
   app.use('/uploads', express.static('uploads'));
+  
+  // Specifically serve images and documents
+  app.use('/uploads/images', express.static('uploads/images'));
+  app.use('/uploads/documents', express.static('uploads/documents'));
 
   // Example API routes
   app.get("/api/ping", (_, res) => res.json({ status: "ok" }));
@@ -76,7 +86,9 @@ export function createServer() {
 
   // File upload routes
   app.post("/api/upload/driver-documents", authenticate, authorize(['admin']), handleDriverDocumentUpload, handleDriverDocumentUploadInfo);
+  app.post("/api/upload/vehicle-documents", authenticate, authorize(['admin']), handleVehicleDocumentUpload, handleVehicleDocumentUploadInfo);
   app.get("/uploads/documents/:filename", serveUploadedFile);
+  app.get("/uploads/images/:filename", serveUploadedFile);
 
   // Booking routes
   app.post("/api/bookings", authenticate, createBooking);
@@ -94,6 +106,10 @@ export function createServer() {
   app.get("/api/vehicles/search", searchVehicles);
   app.post("/api/vehicles", authenticate, authorize(['admin']), createVehicle);
   app.get("/api/vehicles", listVehicles);
+  app.get("/api/vehicles/:id", authenticate, getVehicle);
+  app.get("/api/vehicles/:id/documents", authenticate, getVehicleDocuments);
+  app.put("/api/vehicles/:id", authenticate, authorize(['admin']), updateVehicle);
+  app.delete("/api/vehicles/:id", authenticate, authorize(['admin']), deleteVehicle);
   app.post("/api/vehicles/:id/documents", authenticate, addVehicleDocument);
   app.post("/api/vehicles/:id/maintenance", authenticate, addMaintenance);
   app.post("/api/vehicles/:id/mileage", authenticate, addMileage);

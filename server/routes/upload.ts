@@ -68,6 +68,13 @@ export const handleDriverDocumentUpload: RequestHandler = upload.fields([
   { name: 'profile_image', maxCount: 1 }
 ]);
 
+// Handle document upload for vehicle registration
+export const handleVehicleDocumentUpload: RequestHandler = upload.fields([
+  { name: 'vehicle_image', maxCount: 1 },
+  { name: 'registration_doc', maxCount: 1 },
+  { name: 'insurance_doc', maxCount: 1 }
+]);
+
 // Get uploaded file info
 export const handleDriverDocumentUploadInfo: RequestHandler = (req, res) => {
   try {
@@ -92,6 +99,43 @@ export const handleDriverDocumentUploadInfo: RequestHandler = (req, res) => {
 
     if (files.profile_image && files.profile_image[0]) {
       uploadedFiles.profile_image_url = `/uploads/images/${files.profile_image[0].filename}`;
+    }
+
+    res.json({
+      success: true,
+      files: uploadedFiles
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      error: error.message || 'Upload failed' 
+    });
+  }
+};
+
+// Get vehicle uploaded file info
+export const handleVehicleDocumentUploadInfo: RequestHandler = (req, res) => {
+  try {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    
+    if (!files) {
+      return res.status(400).json({ 
+        error: 'No files uploaded' 
+      });
+    }
+
+    const uploadedFiles: { [key: string]: string } = {};
+    
+    // Process uploaded files and return their URLs
+    if (files.vehicle_image && files.vehicle_image[0]) {
+      uploadedFiles.vehicle_image_url = `/uploads/images/${files.vehicle_image[0].filename}`;
+    }
+    
+    if (files.registration_doc && files.registration_doc[0]) {
+      uploadedFiles.registration_doc_url = `/uploads/documents/${files.registration_doc[0].filename}`;
+    }
+
+    if (files.insurance_doc && files.insurance_doc[0]) {
+      uploadedFiles.insurance_doc_url = `/uploads/documents/${files.insurance_doc[0].filename}`;
     }
 
     res.json({
