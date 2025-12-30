@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import type { CreateBookingRequest, CreateBookingResponse, ListBookingsResponse, Booking, User, UpdateBookingRequest, UpdateBookingResponse, Vehicle } from "@shared/api";
 import { selectToken } from "../store/auth";
+import { Button } from "../components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../components/ui/alert-dialog";
+import { ArrowLeft } from "lucide-react";
 
 export default function Bookings() {
   const token = useSelector(selectToken);
   const directToken = localStorage.getItem('token');
+  const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showEditConfirmDialog, setShowEditConfirmDialog] = useState(false);
+  const [showNoDriverConfirmDialog, setShowNoDriverConfirmDialog] = useState(false);
+  const [showDriverConfirmDialog, setShowDriverConfirmDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'create' | 'edit' | null>(null);
   const [items, setItems] = useState<Booking[]>([]);
   const [customers, setCustomers] = useState<User[]>([]);
   const [drivers, setDrivers] = useState<User[]>([]);
@@ -29,9 +38,13 @@ export default function Bookings() {
     created_by_name: "",
     pickup_point: "",
     dropoff_point: "",
+    special_instructions: "",
     driver_id: null,
     customer_id: undefined, // Add customer_id field
     contact_name: "", // Add contact_name field
+    contact_phone: "",
+    contact_email: "",
+    vehicle_id: null,
   });
 
   const [editForm, setEditForm] = useState<UpdateBookingRequest>({});
@@ -73,6 +86,25 @@ export default function Bookings() {
     }
   };
 
+  const toDateTimeLocalValue = (v: string | null | undefined) => {
+    if (!v) return '';
+
+    // If already in datetime-local compatible form, keep only YYYY-MM-DDTHH:mm
+    if (typeof v === 'string' && v.includes('T') && !v.endsWith('Z')) {
+      return v.slice(0, 16);
+    }
+
+    // Convert ISO (likely with Z) to local datetime-local value
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) {
+      // Fallback for "YYYY-MM-DD HH:mm:ss" from DB
+      return v.replace(' ', 'T').slice(0, 16);
+    }
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   const load = async () => {
     try {
       setError(null);
@@ -101,10 +133,15 @@ export default function Bookings() {
         if (selectedCustomer) {
           updated.customer_id = Number(value);
           updated.contact_name = `${selectedCustomer.profile?.first_name} ${selectedCustomer.profile?.last_name}`;
+          updated.contact_email = selectedCustomer.email ?? '';
         }
       } else {
-        updated[name] = name === 'service_id' || name === 'estimated_price_cents' || name === 'vehicle_id'
-          ? (value === '' ? 0 : Number(value)) 
+        updated[name] = name === 'service_id'
+          ? (value === '' ? 0 : Number(value))
+          : name === 'estimated_price_cents'
+          ? (value === '' ? undefined : Number(value))
+          : name === 'vehicle_id'
+          ? (value === '' ? null : Number(value))
           : name === 'driver_id'
           ? (value === '' ? null : Number(value))
           : value;
@@ -114,8 +151,17 @@ export default function Bookings() {
     });
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setPendingAction('create');
+    if (!form.driver_id) {
+      setShowNoDriverConfirmDialog(true);
+    } else {
+      setShowDriverConfirmDialog(true);
+    }
+  };
+
+  const doCreate = async () => {
     setCreating(true);
     setMessage(null);
     setError(null);
@@ -138,12 +184,18 @@ export default function Bookings() {
         created_by_name: "",
         pickup_point: "",
         dropoff_point: "",
+        special_instructions: "",
         driver_id: null,
         customer_id: undefined,
         contact_name: "",
-        vehicle_id: undefined,
+        contact_phone: "",
+        contact_email: "",
+        vehicle_id: null,
       });
       load();
+      // Notify calendar page to refresh after booking creation
+      window.postMessage({ type: 'BOOKING_UPDATED', payload: { id: data.id } }, window.location.origin);
+      localStorage.setItem('taxi_booking_updated', Date.now().toString());
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -152,15 +204,25 @@ export default function Bookings() {
   };
 
   const startEdit = (booking: Booking) => {
+    const anyB = booking as any;
     setEditing(booking.id);
     setEditForm({
       service_id: booking.service_id,
-      start_time: booking.start_time.replace(' ', 'T'),
-      end_time: booking.end_time.replace(' ', 'T'),
+      start_time: toDateTimeLocalValue(booking.start_time),
+      end_time: toDateTimeLocalValue(booking.end_time),
+      source: booking.source,
+      pickup_point: booking.pickup_point ?? '',
+      dropoff_point: booking.dropoff_point ?? '',
+      special_instructions: booking.special_instructions ?? '',
+      contact_name: booking.contact_name ?? '',
+      contact_phone: booking.contact_phone ?? '',
+      contact_email: booking.contact_email ?? '',
       estimated_price_cents: booking.estimated_price_cents,
       status: booking.status,
       admin_note: booking.admin_note || '',
+      created_by_name: booking.created_by_name ?? '',
       driver_id: booking.driver_id,
+      customer_id: anyB.customer_id ?? null,
       vehicle_id: booking.vehicle_id,
     });
     setShowEditForm(true);
@@ -174,33 +236,88 @@ export default function Bookings() {
 
   const onEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+
+    // Keep edit experience aligned with create: selecting customer can auto-fill contact fields.
+    if (name === 'customer_id') {
+      const selected = customers.find(c => Number(c.id) === Number(value));
+      setEditForm(prev => ({
+        ...prev,
+        customer_id: value === '' ? null : Number(value),
+        contact_name: selected ? `${selected.profile?.first_name} ${selected.profile?.last_name}` : (prev.contact_name ?? ''),
+        contact_email: selected?.email ?? (prev.contact_email ?? ''),
+      }));
+      return;
+    }
+
     setEditForm(prev => ({
       ...prev,
       [name]: name === 'service_id' || name === 'estimated_price_cents' || name === 'vehicle_id'
-        ? (value === '' ? 0 : Number(value)) 
+        ? (value === '' ? 0 : Number(value))
         : name === 'driver_id'
         ? (value === '' ? null : Number(value))
         : value
     }));
   };
 
-  const onUpdate = async (e: React.FormEvent) => {
+  const onUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing) return;
-    
+    setPendingAction('edit');
+    if (!editForm.driver_id) {
+      setShowNoDriverConfirmDialog(true);
+    } else {
+      setShowDriverConfirmDialog(true);
+    }
+  };
+
+  const confirmUpdate = async () => {
+    if (!editing) return;
+    setShowEditConfirmDialog(false);
     try {
       const res = await fetch(`/api/bookings/${editing}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: headers(),
         body: JSON.stringify(editForm),
       });
-      const data: UpdateBookingResponse = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to update booking");
+
+      const raw = await res.text();
+      const data: UpdateBookingResponse = raw ? JSON.parse(raw) : { ok: false, error: 'Empty response from server' };
+      if (!res.ok || !data.ok) throw new Error(data.error || raw || "Failed to update booking");
       setMessage(`Booking #${editing} updated!`);
       cancelEdit();
       load();
+      // Notify calendar page to refresh after driver assignment
+      window.postMessage({ type: 'BOOKING_UPDATED', payload: { id: editing } }, window.location.origin);
+      // Fallback: localStorage event for cross-tab sync
+      localStorage.setItem('taxi_booking_updated', Date.now().toString());
     } catch (e: any) {
       setError(e.message);
+    }
+  };
+
+  const confirmNoDriver = () => {
+    setShowNoDriverConfirmDialog(false);
+    if (pendingAction === 'create') {
+      // Set status to 'scheduled' when no driver is assigned
+      setForm(prev => ({ ...prev, status: 'scheduled' }));
+      doCreate();
+    } else if (pendingAction === 'edit') {
+      // Set status to 'scheduled' when no driver is assigned
+      setEditForm(prev => ({ ...prev, status: 'scheduled' }));
+      setShowEditConfirmDialog(true);
+    }
+  };
+
+  const confirmDriver = () => {
+    setShowDriverConfirmDialog(false);
+    if (pendingAction === 'create') {
+      // Set status to 'confirmed' when driver is assigned
+      setForm(prev => ({ ...prev, status: 'confirmed' }));
+      doCreate();
+    } else if (pendingAction === 'edit') {
+      // Set status to 'confirmed' when driver is assigned
+      setEditForm(prev => ({ ...prev, status: 'confirmed' }));
+      setShowEditConfirmDialog(true);
     }
   };
 
@@ -279,16 +396,26 @@ export default function Bookings() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Bookings</h1>
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Booking Dashboard</h1>
+        <Button variant="outline" type="button" onClick={() => navigate('/')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+      </div>
 
       {message && <div className="mb-4 p-3 bg-green-100 text-green-800 rounded">{message}</div>}
       {error && <div className="mb-4 p-3 bg-red-100 text-red-800 rounded">{error}</div>}
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Create New Booking</h2>
-        
-        <form onSubmit={onSubmit} className="space-y-4">
+      {/* Two-column layout: Booking Register (left) and Booking Management (right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Booking Register Section */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Booking Register</h2>
+          
+          <form onSubmit={onSubmit} className="space-y-4">
           {/* Customer, Driver, and Vehicle Selection */}
           <div className="space-y-4">
             <div>
@@ -355,6 +482,32 @@ export default function Bookings() {
                   ))}
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Contact info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Contact Phone</label>
+              <input
+                name="contact_phone"
+                type="text"
+                className="w-full rounded border px-3 py-2"
+                value={form.contact_phone || ''}
+                onChange={onChange}
+                placeholder="Contact phone"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Contact Email</label>
+              <input
+                name="contact_email"
+                type="email"
+                className="w-full rounded border px-3 py-2"
+                value={form.contact_email || ''}
+                onChange={onChange}
+                placeholder="Contact email"
+              />
             </div>
           </div>
 
@@ -483,6 +636,19 @@ export default function Bookings() {
             />
           </div>
 
+          {/* Special Instructions */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Special Instructions</label>
+            <textarea
+              name="special_instructions"
+              className="w-full rounded border px-3 py-2"
+              rows={3}
+              value={form.special_instructions || ''}
+              onChange={onChange}
+              placeholder="Any special instructions..."
+            />
+          </div>
+
           <button 
             type="submit" 
             disabled={creating}
@@ -491,10 +657,11 @@ export default function Bookings() {
             {creating ? "Creating..." : "Create Booking"}
           </button>
         </form>
-      </div>
+        </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4">Recent Bookings</h2>
+        {/* Booking Management Section */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Booking Management</h2>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
             <div>
@@ -725,6 +892,21 @@ export default function Bookings() {
                     </button>
                   </div>
                 </div>
+
+                {/* Booking Source */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Booking Source</label>
+                  <select
+                    name="source"
+                    className="w-full rounded border px-3 py-2"
+                    value={editForm.source || ''}
+                    onChange={onEditChange}
+                  >
+                    <option value="phone">Phone</option>
+                    <option value="email">Email</option>
+                    <option value="web">Web</option>
+                  </select>
+                </div>
               </div>
             );
           })}
@@ -751,6 +933,24 @@ export default function Bookings() {
               </div>
 
               <form onSubmit={onUpdate} className="space-y-4">
+                {/* Customer */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Customer</label>
+                  <select
+                    name="customer_id"
+                    className="w-full rounded border px-3 py-2"
+                    value={(editForm as any).customer_id ?? ''}
+                    onChange={onEditChange}
+                  >
+                    <option value="">Select a customer...</option>
+                    {customers.map(customer => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.profile?.first_name} {customer.profile?.last_name} {customer.email ? `(${customer.email})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Service Type and Status */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -783,6 +983,21 @@ export default function Bookings() {
                       <option value="no_show">No Show</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Booking Source */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Booking Source</label>
+                  <select
+                    name="source"
+                    className="w-full rounded border px-3 py-2"
+                    value={editForm.source || ''}
+                    onChange={onEditChange}
+                  >
+                    <option value="phone">Phone</option>
+                    <option value="email">Email</option>
+                    <option value="web">Web</option>
+                  </select>
                 </div>
 
                 {/* Driver and Vehicle Selection */}
@@ -846,6 +1061,69 @@ export default function Bookings() {
                   </div>
                 </div>
 
+                {/* Pickup and Dropoff */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Pickup Location</label>
+                    <input
+                      name="pickup_point"
+                      type="text"
+                      className="w-full rounded border px-3 py-2"
+                      value={editForm.pickup_point || ''}
+                      onChange={onEditChange}
+                      placeholder="Enter pickup address"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Dropoff Location</label>
+                    <input
+                      name="dropoff_point"
+                      type="text"
+                      className="w-full rounded border px-3 py-2"
+                      value={editForm.dropoff_point || ''}
+                      onChange={onEditChange}
+                      placeholder="Enter dropoff address"
+                    />
+                  </div>
+                </div>
+
+                {/* Contact info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Contact Name</label>
+                    <input
+                      name="contact_name"
+                      type="text"
+                      className="w-full rounded border px-3 py-2"
+                      value={editForm.contact_name || ''}
+                      onChange={onEditChange}
+                      placeholder="Contact name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Contact Phone</label>
+                    <input
+                      name="contact_phone"
+                      type="text"
+                      className="w-full rounded border px-3 py-2"
+                      value={editForm.contact_phone || ''}
+                      onChange={onEditChange}
+                      placeholder="Contact phone"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Contact Email</label>
+                  <input
+                    name="contact_email"
+                    type="email"
+                    className="w-full rounded border px-3 py-2"
+                    value={editForm.contact_email || ''}
+                    onChange={onEditChange}
+                    placeholder="Contact email"
+                  />
+                </div>
+
                 {/* Price */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Estimated Price (cents)</label>
@@ -856,6 +1134,32 @@ export default function Bookings() {
                     value={editForm.estimated_price_cents || ''} 
                     onChange={onEditChange}
                     placeholder="e.g., 2500 for $25.00"
+                  />
+                </div>
+
+                {/* Created By Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Created By Name</label>
+                  <input
+                    name="created_by_name"
+                    type="text"
+                    className="w-full rounded border px-3 py-2"
+                    value={editForm.created_by_name || ''}
+                    onChange={onEditChange}
+                    placeholder="Your name"
+                  />
+                </div>
+
+                {/* Special Instructions */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Special Instructions</label>
+                  <textarea
+                    name="special_instructions"
+                    className="w-full rounded border px-3 py-2"
+                    rows={3}
+                    value={editForm.special_instructions || ''}
+                    onChange={onEditChange}
+                    placeholder="Any special instructions..."
                   />
                 </div>
 
@@ -893,6 +1197,55 @@ export default function Bookings() {
           </div>
         )}
       </div>
+      </div>
+
+      {/* No Driver Confirmation Dialog */}
+      <AlertDialog open={showNoDriverConfirmDialog} onOpenChange={setShowNoDriverConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No driver assigned</AlertDialogTitle>
+            <AlertDialogDescription>
+              No driver assigned, booking saved without confirm and not show in the calendar view as well. Are you sure you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmNoDriver}>Proceed</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Driver Confirmation Dialog */}
+      <AlertDialog open={showDriverConfirmDialog} onOpenChange={setShowDriverConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Driver assigned</AlertDialogTitle>
+            <AlertDialogDescription>
+              Driver assigned. This booking will be confirmed and shown in the calendar. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDriver}>Confirm Booking</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Confirmation Dialog */}
+      <AlertDialog open={showEditConfirmDialog} onOpenChange={setShowEditConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will update the booking with the changes you made. Do you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmUpdate}>Update Booking</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

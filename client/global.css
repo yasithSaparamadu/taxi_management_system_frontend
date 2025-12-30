@@ -129,6 +129,18 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-image:
+      linear-gradient(
+        180deg,
+        hsl(var(--background) / 0.80) 0%,
+        hsl(var(--background) / 0.70) 40%,
+        hsl(var(--background) / 0.85) 100%
+      ),
+      url('/background_image.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 }

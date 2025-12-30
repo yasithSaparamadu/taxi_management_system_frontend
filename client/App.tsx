@@ -26,6 +26,9 @@ import AdminCustomerManagement from "./pages/AdminCustomerManagement";
 import AdminVehicleRegistration from "./pages/AdminVehicleRegistration";
 import AdminVehicleManagement from "./pages/AdminVehicleManagement";
 import DriverDashboard from "./pages/DriverDashboard";
+import BookingDashboard from "./pages/BookingDashboard";
+import BookingRegister from "./pages/BookingRegister";
+import BookingManagement from "./pages/BookingManagement";
 import { AdminRoute, DriverRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -40,7 +43,7 @@ const App = () => (
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<AdminRoute><DashboardSelection /></AdminRoute>} />
-              <Route path="/bookings" element={<AdminRoute><Bookings /></AdminRoute>} />
+              <Route path="/bookings" element={<AdminRoute><BookingDashboard /></AdminRoute>} />
               <Route path="/invoices" element={<AdminRoute><Invoices /></AdminRoute>} />
               <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
               <Route path="/calendar" element={<AdminRoute><CalendarPage /></AdminRoute>} />
@@ -55,6 +58,9 @@ const App = () => (
             <Route path="/admin/customers/manage" element={<AdminRoute><AdminCustomerManagement /></AdminRoute>} />
             <Route path="/admin/vehicles/register" element={<AdminRoute><AdminVehicleRegistration /></AdminRoute>} />
             <Route path="/admin/vehicles/manage" element={<AdminRoute><AdminVehicleManagement /></AdminRoute>} />
+            <Route path="/booking-dashboard" element={<AdminRoute><BookingDashboard /></AdminRoute>} />
+            <Route path="/booking-dashboard/register" element={<AdminRoute><BookingRegister /></AdminRoute>} />
+            <Route path="/booking-dashboard/management" element={<AdminRoute><BookingManagement /></AdminRoute>} />
             <Route path="/driver" element={<DriverRoute><DriverDashboard /></DriverRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -132,23 +132,19 @@ export default function AdminUserRegistration() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center py-6">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/admin')}
-              className="mr-4"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
+          <div className="flex items-center justify-between py-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">User Registration</h1>
               <p className="text-sm text-gray-600">Create a new user account</p>
             </div>
+            <Button variant="outline" type="button" onClick={() => navigate('/admin')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
           </div>
         </div>
       </header>

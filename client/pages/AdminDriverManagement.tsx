@@ -209,29 +209,25 @@ export default function AdminDriverManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
-            <div className="flex items-center">
-              <Button
-                variant="outline"
-                onClick={() => navigate('/admin')}
-                className="mr-4"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Driver Management</h1>
-                <p className="text-sm text-gray-600">View and manage all registered drivers</p>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Driver Management</h1>
+              <p className="text-sm text-gray-600">View and manage all registered drivers</p>
             </div>
-            <Button onClick={() => navigate('/admin/drivers')}>
-              <Car className="h-4 w-4 mr-2" />
-              Register New Driver
-            </Button>
+            <div className="flex items-center space-x-4">
+              <Button onClick={() => navigate('/admin/drivers')}>
+                <Car className="h-4 w-4 mr-2" />
+                Register New Driver
+              </Button>
+              <Button variant="outline" type="button" onClick={() => navigate('/admin')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            </div>
           </div>
         </div>
       </header>

@@ -133,10 +133,19 @@ export interface UpdateBookingRequest {
   service_id?: number;
   start_time?: string;
   end_time?: string;
+  source?: 'email' | 'phone' | 'web';
+  pickup_point?: string;
+  dropoff_point?: string;
+  special_instructions?: string;
+  contact_name?: string;
+  contact_phone?: string;
+  contact_email?: string;
   estimated_price_cents?: number | null;
   status?: BookingStatus; // allow downgrade/cancel
   admin_note?: string; // admin-only
+  created_by_name?: string;
   driver_id?: number | null;
+  customer_id?: number | null;
   vehicle_id?: number | null;
 }
 export interface UpdateBookingResponse { ok: boolean; error?: string }

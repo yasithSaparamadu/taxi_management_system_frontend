@@ -28,7 +28,7 @@ function getRoleFromHeaders(req: any): 'admin' | 'staff' | 'unknown' {
   return 'unknown';
 }
 
-const isoDateTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+const isoDateTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{3})?)?Z?$/;
 
 const CreateSchema = z.object({
   service_id: z.coerce.number().int().positive(),
@@ -337,16 +337,25 @@ const UpdateSchema = z.object({
   service_id: z.coerce.number().int().positive().optional(),
   start_time: z.string().regex(isoDateTime).optional(),
   end_time: z.string().regex(isoDateTime).optional(),
+  source: z.enum(['email','phone','web']).optional(),
+  pickup_point: z.string().max(255).optional().or(z.literal("")),
+  dropoff_point: z.string().max(255).optional().or(z.literal("")),
+  special_instructions: z.string().max(5000).optional().or(z.literal("")),
+  contact_name: z.string().max(150).optional().or(z.literal("")),
+  contact_phone: z.string().max(50).optional().or(z.literal("")),
+  contact_email: z.string().email().max(255).optional().or(z.literal("")),
   estimated_price_cents: z.union([z.coerce.number().int().min(0), z.null()]).optional(),
   status: z.enum(['scheduled','confirmed','completed','cancelled','no_show']).optional(),
   admin_note: z.string().max(5000).optional(),
+  created_by_name: z.string().max(150).optional().or(z.literal("")),
   driver_id: z.coerce.number().int().positive().nullable().optional(),
+  customer_id: z.coerce.number().int().positive().nullable().optional(),
   vehicle_id: z.coerce.number().int().positive().nullable().optional(),
 });
 
 export const updateBooking: RequestHandler = async (req, res) => {
   try {
-    const role = getRoleFromHeaders(req);
+    const role = (req as any).user?.role ?? getRoleFromHeaders(req);
     if (role !== 'admin') {
       return res.status(401).json({ ok: false, error: 'Admin only' } as UpdateBookingResponse);
     }
@@ -385,12 +394,21 @@ export const updateBooking: RequestHandler = async (req, res) => {
     const fields: string[] = [];
     const vals: any[] = [];
     if (b.service_id !== undefined) { fields.push('service_id=?'); vals.push(b.service_id); }
-    if (b.start_time !== undefined) { fields.push('start_time=?'); vals.push(b.start_time.replace('T', ' ')); }
-    if (b.end_time !== undefined) { fields.push('end_time=?'); vals.push(b.end_time.replace('T', ' ')); }
+    if (b.start_time !== undefined) { fields.push('start_time=?'); vals.push(new Date(b.start_time).toISOString().slice(0, 19).replace('T', ' ')); }
+    if (b.end_time !== undefined) { fields.push('end_time=?'); vals.push(new Date(b.end_time).toISOString().slice(0, 19).replace('T', ' ')); }
+    if (b.source !== undefined) { fields.push('source=?'); vals.push(b.source); }
+    if (b.pickup_point !== undefined) { fields.push('pickup_point=NULLIF(?, "")'); vals.push(b.pickup_point ?? ''); }
+    if (b.dropoff_point !== undefined) { fields.push('dropoff_point=NULLIF(?, "")'); vals.push(b.dropoff_point ?? ''); }
+    if (b.special_instructions !== undefined) { fields.push('special_instructions=NULLIF(?, "")'); vals.push(b.special_instructions ?? ''); }
+    if (b.contact_name !== undefined) { fields.push('contact_name=NULLIF(?, "")'); vals.push(b.contact_name ?? ''); }
+    if (b.contact_phone !== undefined) { fields.push('contact_phone=NULLIF(?, "")'); vals.push(b.contact_phone ?? ''); }
+    if (b.contact_email !== undefined) { fields.push('contact_email=NULLIF(?, "")'); vals.push(b.contact_email ?? ''); }
     if (b.estimated_price_cents !== undefined) { fields.push('estimated_price_cents=?'); vals.push(b.estimated_price_cents); }
     if (b.status !== undefined) { fields.push('status=?'); vals.push(b.status); }
     if (b.admin_note !== undefined) { fields.push('admin_note=NULLIF(?, "")'); vals.push(b.admin_note ?? ''); }
+    if (b.created_by_name !== undefined) { fields.push('created_by_name=NULLIF(?, "")'); vals.push(b.created_by_name ?? ''); }
     if (b.driver_id !== undefined) { fields.push('driver_id=?'); vals.push(b.driver_id); }
+    if (b.customer_id !== undefined) { fields.push('customer_id=?'); vals.push(b.customer_id); }
     if (b.vehicle_id !== undefined) { fields.push('vehicle_id=?'); vals.push(b.vehicle_id); }
 
     if (fields.length === 0) {

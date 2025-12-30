@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 export type CalendarEvent = {
@@ -34,6 +35,13 @@ const OutlookCalendar: React.FC<{
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [viewType, setViewType] = useState<ViewType>(initialView);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
+
+  const openEventDialog = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setIsEventDialogOpen(true);
+  };
 
   // Navigation functions
   const navigatePrevious = () => {
@@ -233,7 +241,7 @@ const OutlookCalendar: React.FC<{
           {hours.map((hour) => (
             <div key={hour} className="grid grid-cols-8 border-b border-gray-100">
               <div className="p-2 text-xs text-gray-500 text-right">
-                {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
+                {hour.toString().padStart(2, '0')}:00
               </div>
               {weekDates.map((date) => {
                 const hourEvents = getEventsForDate(date).filter(event => {
@@ -247,10 +255,11 @@ const OutlookCalendar: React.FC<{
                       <div
                         key={event.id}
                         className={cn(
-                          "text-xs p-1 rounded border mb-1",
+                          "text-xs p-1 rounded border mb-1 cursor-pointer",
                           getEventColor(event)
                         )}
                         style={getEventStyle(event)}
+                        onClick={() => openEventDialog(event)}
                       >
                         <div className="font-medium">{event.title}</div>
                         <div className="text-xs opacity-75">{event.startTime} - {event.endTime}</div>
@@ -287,7 +296,7 @@ const OutlookCalendar: React.FC<{
           {hours.map((hour) => (
             <div key={hour} className="flex border-b border-gray-100">
               <div className="w-20 p-2 text-xs text-gray-500 text-right">
-                {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
+                {hour.toString().padStart(2, '0')}:00
               </div>
               <div className="flex-1 min-h-[60px] border-l border-gray-100 p-2">
                 {dayEvents
@@ -296,32 +305,25 @@ const OutlookCalendar: React.FC<{
                     <div
                       key={event.id}
                       className={cn(
-                        "p-2 rounded border mb-2",
+                        "p-2 rounded border mb-2 cursor-pointer",
                         getEventColor(event)
                       )}
                       style={getEventStyle(event)}
+                      onClick={() => openEventDialog(event)}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">{event.title}</div>
-                        <Badge variant="outline" className="text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-sm">
+                          <span className="font-medium">{event.title}</span>
+                          <span className="opacity-75"> • {event.startTime}-{event.endTime}</span>
+                          {event.customer && <span className="opacity-75"> • Customer: {event.customer}</span>}
+                          {event.driver && <span className="opacity-75"> • {event.driver}</span>}
+                          {event.location && <span className="opacity-75"> • {event.location}</span>}
+                          {event.description && <span className="opacity-75"> • {event.description}</span>}
+                        </div>
+                        <Badge variant="outline" className="text-xs shrink-0">
                           {event.status}
                         </Badge>
                       </div>
-                      <div className="text-sm opacity-75 mt-1">
-                        {event.startTime} - {event.endTime}
-                      </div>
-                      {event.customer && (
-                        <div className="text-sm opacity-75 mt-1">Customer: {event.customer}</div>
-                      )}
-                      {event.driver && (
-                        <div className="text-sm opacity-75 mt-1">👤 {event.driver}</div>
-                      )}
-                      {event.location && (
-                        <div className="text-sm opacity-75 mt-1">📍 {event.location}</div>
-                      )}
-                      {event.description && (
-                        <div className="text-sm opacity-75 mt-1">{event.description}</div>
-                      )}
                     </div>
                   ))}
               </div>
@@ -358,31 +360,25 @@ const OutlookCalendar: React.FC<{
                          style={getEventStyle(event)} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium text-gray-900">{event.title}</h4>
-                        <Badge variant="outline" className="text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-sm text-gray-700">
+                          <button
+                            type="button"
+                            className="font-medium text-gray-900 hover:underline"
+                            onClick={() => openEventDialog(event)}
+                          >
+                            {event.title}
+                          </button>
+                          <span className="text-gray-500"> • {format(event.date, "MMM d, yyyy")}</span>
+                          <span className="text-gray-500"> • {event.startTime}-{event.endTime}</span>
+                          {event.customer && <span className="text-gray-500"> • {event.customer}</span>}
+                          {event.location && <span className="text-gray-500"> • {event.location}</span>}
+                          {event.description && <span className="text-gray-600"> • {event.description}</span>}
+                        </div>
+                        <Badge variant="outline" className="text-xs shrink-0">
                           {event.status}
                         </Badge>
                       </div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        <Clock className="inline w-3 h-3 mr-1" />
-                        {format(event.date, "MMM d, yyyy")} • {event.startTime} - {event.endTime}
-                      </div>
-                      {event.customer && (
-                        <div className="text-sm text-gray-500 mt-1">
-                          <Users className="inline w-3 h-3 mr-1" />
-                          {event.customer}
-                        </div>
-                      )}
-                      {event.location && (
-                        <div className="text-sm text-gray-500 mt-1">
-                          <MapPin className="inline w-3 h-3 mr-1" />
-                          {event.location}
-                        </div>
-                      )}
-                      {event.description && (
-                        <p className="text-sm text-gray-600 mt-2">{event.description}</p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -396,6 +392,82 @@ const OutlookCalendar: React.FC<{
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
+      <Dialog
+        open={isEventDialogOpen}
+        onOpenChange={(open) => {
+          setIsEventDialogOpen(open);
+          if (!open) setSelectedEvent(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span
+                className="inline-block h-3 w-3 rounded-full border"
+                style={{ backgroundColor: selectedEvent?.color || undefined, borderColor: selectedEvent?.color || undefined }}
+              />
+              {selectedEvent?.title ?? "Event Details"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2 text-sm">
+            {selectedEvent?.date && (
+              <div className="text-muted-foreground">
+                {format(selectedEvent.date, "PPPP")} • {selectedEvent.startTime}-{selectedEvent.endTime}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">Status</span>
+              <Badge variant="outline" className="capitalize">{selectedEvent?.status ?? ""}</Badge>
+            </div>
+
+            {selectedEvent?.customer && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Customer</span>
+                <span className="text-right">{selectedEvent.customer}</span>
+              </div>
+            )}
+
+            {selectedEvent?.driver && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Driver</span>
+                <span className="text-right">{selectedEvent.driver}</span>
+              </div>
+            )}
+
+            {selectedEvent?.vehicle && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Vehicle</span>
+                <span className="text-right">{selectedEvent.vehicle}</span>
+              </div>
+            )}
+
+            {selectedEvent?.location && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Location</span>
+                <span className="text-right">{selectedEvent.location}</span>
+              </div>
+            )}
+
+            {selectedEvent?.description && (
+              <div>
+                <div className="text-muted-foreground mb-1">Details</div>
+                <div className="whitespace-pre-wrap break-words rounded-md border bg-muted/20 p-3">
+                  {selectedEvent.description}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => setIsEventDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -525,20 +597,24 @@ const OutlookCalendar: React.FC<{
                 {getEventsForDate(selectedDate).map((event) => (
                   <div
                     key={event.id}
-                    className={cn(
-                      "p-2 rounded border text-xs",
-                      getEventColor(event)
-                    )}
+                    className="p-2 rounded border text-xs bg-white cursor-pointer"
+                    style={{
+                      borderLeftWidth: 4,
+                      borderLeftStyle: 'solid',
+                      borderLeftColor: event.color || undefined,
+                    }}
+                    onClick={() => openEventDialog(event)}
                   >
-                    <div className="font-medium">{event.title}</div>
-                    <div className="text-xs opacity-75">
-                      {event.startTime} - {event.endTime}
-                    </div>
-                    {event.customer && (
-                      <div className="text-xs opacity-75">
-                        {event.customer}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                        <span className="font-medium">{event.title}</span>
+                        <span className="opacity-75"> • {event.startTime}-{event.endTime}</span>
+                        {event.customer && <span className="opacity-75"> • {event.customer}</span>}
                       </div>
-                    )}
+                      <Badge variant="outline" className="text-[10px] shrink-0 capitalize">
+                        {event.status}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
                 {getEventsForDate(selectedDate).length === 0 && (

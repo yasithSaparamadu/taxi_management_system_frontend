@@ -55,7 +55,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 export default function AppLayout() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen text-foreground">
       <Sidebar open={open} onClose={() => setOpen(false)} />
       <main className="lg:pl-16">
         <div className="px-4 py-4">

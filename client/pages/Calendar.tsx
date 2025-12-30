@@ -10,7 +10,25 @@ export default function CalendarPage() {
 
   useEffect(() => {
     fetchBookings();
-  }, []);
+    // Listen for booking updates from other pages (e.g., driver assignment in Bookings)
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'BOOKING_UPDATED') {
+        fetchBookings();
+      }
+    };
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'taxi_booking_updated') {
+        fetchBookings();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []); // Added closing bracket here
 
   const fetchBookings = async () => {
     try {
@@ -34,7 +52,9 @@ export default function CalendarPage() {
       if (response.ok) {
         const data: ListBookingsResponse = await response.json();
         if (data.ok && data.items) {
-          const calendarEvents = data.items.map(transformBookingToEvent);
+          const calendarEvents = data.items
+            .filter(booking => booking.status === 'confirmed')
+            .map(transformBookingToEvent);
           setEvents(calendarEvents);
           setAuthError(false);
         }

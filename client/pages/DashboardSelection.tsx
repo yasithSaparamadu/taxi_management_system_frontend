@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { clearAuth } from '../store/auth';
+import { useSelector } from 'react-redux';
+import { selectUser } from '../store/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import type { ListBookingsResponse, ListVehiclesResponse, Booking } from '@shared/api';
 import { 
   LayoutDashboard, 
   Users, 
@@ -29,7 +32,14 @@ interface DashboardOption {
 export default function DashboardSelection() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const user = useSelector(selectUser);
   const [isLoading, setIsLoading] = useState(false);
+  const [stats, setStats] = useState<{ activeBookings: number | null; activeDrivers: number | null; activeVehicles: number | null; todaysRevenue: number | null }>({
+    activeBookings: null,
+    activeDrivers: null,
+    activeVehicles: null,
+    todaysRevenue: null,
+  });
 
   const dashboardOptions: DashboardOption[] = [
     
@@ -71,6 +81,64 @@ export default function DashboardSelection() {
     }, 300);
   };
 
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+
+    const loadStats = async () => {
+      try {
+        const [bookingsRes, vehiclesRes, driversRes] = await Promise.all([
+          fetch('/api/bookings', { headers }),
+          fetch('/api/vehicles', { headers }),
+          fetch('/api/users?role=driver', { headers }),
+        ]);
+
+        const bookingsData: ListBookingsResponse = await bookingsRes.json();
+        const vehiclesData: ListVehiclesResponse = await vehiclesRes.json();
+        const driversData: any = await driversRes.json();
+
+        const bookings = bookingsData?.ok ? bookingsData.items : [];
+        const vehicles = vehiclesData?.ok ? vehiclesData.items : [];
+        const drivers: any[] = Array.isArray(driversData?.users) ? driversData.users : [];
+
+        const isActiveBooking = (b: Booking) => !['completed', 'cancelled', 'no_show'].includes(String((b as any).status));
+
+        const activeBookings = bookings.filter(isActiveBooking).length;
+        const activeVehicles = vehicles.filter(v => v.status === 'active').length;
+        const activeDrivers = drivers.filter(d => d.status === 'active').length;
+
+        const today = new Date();
+        const todayYMD = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        const todaysRevenueCents = bookings
+          .filter(b => String((b as any).status) === 'completed')
+          .filter(b => {
+            const d = new Date(b.start_time);
+            if (Number.isNaN(d.getTime())) return false;
+            const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            return ymd === todayYMD;
+          })
+          .reduce((sum, b) => sum + (b.estimated_price_cents ?? 0), 0);
+
+        setStats({
+          activeBookings,
+          activeDrivers,
+          activeVehicles,
+          todaysRevenue: todaysRevenueCents / 100,
+        });
+      } catch {
+        setStats({ activeBookings: 0, activeDrivers: 0, activeVehicles: 0, todaysRevenue: 0 });
+      }
+    };
+
+    loadStats();
+  }, []);
+
   const getBadgeColor = (badge?: string) => {
     switch (badge) {
       case 'Primary': return 'bg-blue-100 text-blue-800';
@@ -83,14 +151,18 @@ export default function DashboardSelection() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Welcome Back!</h1>
-              <p className="text-gray-600 mt-1">Choose your dashboard to get started</p>
+            <div className="flex items-center space-x-2">
+              <p className="text-gray-900 font-bold text-3xl">
+                Welcome Back 
+              </p>
+              <span className="font-bold text-blue-600 text-3xl">
+                {user?.profile?.first_name ? user.profile.first_name : (user?.email ?? '')}
+              </span>
             </div>
             <div className="flex items-center space-x-4">
               <Badge variant="outline" className="text-green-600 border-green-600">
@@ -120,7 +192,7 @@ export default function DashboardSelection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-600 text-sm font-medium">Active Bookings</p>
-                  <p className="text-2xl font-bold text-blue-900">24</p>
+                  <p className="text-2xl font-bold text-blue-900">{stats.activeBookings ?? '-'}</p>
                 </div>
                 <Calendar className="h-8 w-8 text-blue-600" />
               </div>
@@ -132,7 +204,7 @@ export default function DashboardSelection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-600 text-sm font-medium">Available Vehicles</p>
-                  <p className="text-2xl font-bold text-green-900">18</p>
+                  <p className="text-2xl font-bold text-green-900">{stats.activeVehicles ?? '-'}</p>
                 </div>
                 <Car className="h-8 w-8 text-green-600" />
               </div>
@@ -144,7 +216,7 @@ export default function DashboardSelection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-purple-600 text-sm font-medium">Active Drivers</p>
-                  <p className="text-2xl font-bold text-purple-900">12</p>
+                  <p className="text-2xl font-bold text-purple-900">{stats.activeDrivers ?? '-'}</p>
                 </div>
                 <Users className="h-8 w-8 text-purple-600" />
               </div>
@@ -156,7 +228,9 @@ export default function DashboardSelection() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-orange-600 text-sm font-medium">Today's Revenue</p>
-                  <p className="text-2xl font-bold text-orange-900">$3,240</p>
+                  <p className="text-2xl font-bold text-orange-900">
+                    {stats.todaysRevenue === null ? '-' : `$${stats.todaysRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-orange-600" />
               </div>
