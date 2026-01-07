@@ -313,36 +313,90 @@ export default function BookingRegister() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Start Time *</label>
-              <input 
-                name="start_time" 
-                type="datetime-local" 
-                className="w-full rounded border px-3 py-2" 
-                onChange={onChange}
-                required
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                  <input 
+                    name="start_date" 
+                    type="date" 
+                    className="w-full rounded border px-3 py-2" 
+                    value={form.start_time ? new Date(form.start_time).toISOString().slice(0, 10) : ''} 
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      const existingTime = form.start_time ? new Date(form.start_time).toTimeString().slice(0, 8) : '00:00';
+                      const newDateTime = `${newDate}T${existingTime}`;
+                      onChange({ target: { name: 'start_time', value: newDateTime } } as any);
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Time (24h)</label>
+                  <input 
+                    name="start_time_only" 
+                    type="time" 
+                    className="w-full rounded border px-3 py-2" 
+                    value={form.start_time ? new Date(form.start_time).toTimeString().slice(0, 5) : ''} 
+                    onChange={(e) => {
+                      const newTime = e.target.value;
+                      const existingDate = form.start_time ? new Date(form.start_time).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+                      const newDateTime = `${existingDate}T${newTime}:00`;
+                      onChange({ target: { name: 'start_time', value: newDateTime } } as any);
+                    }}
+                    required
+                  />
+                </div>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">End Time *</label>
-              <input 
-                name="end_time" 
-                type="datetime-local" 
-                className="w-full rounded border px-3 py-2" 
-                onChange={onChange}
-                required
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                  <input 
+                    name="end_date" 
+                    type="date" 
+                    className="w-full rounded border px-3 py-2" 
+                    value={form.end_time ? new Date(form.end_time).toISOString().slice(0, 10) : ''} 
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      const existingTime = form.end_time ? new Date(form.end_time).toTimeString().slice(0, 8) : '00:00';
+                      const newDateTime = `${newDate}T${existingTime}`;
+                      onChange({ target: { name: 'end_time', value: newDateTime } } as any);
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Time (24h)</label>
+                  <input 
+                    name="end_time_only" 
+                    type="time" 
+                    className="w-full rounded border px-3 py-2" 
+                    value={form.end_time ? new Date(form.end_time).toTimeString().slice(0, 5) : ''} 
+                    onChange={(e) => {
+                      const newTime = e.target.value;
+                      const existingDate = form.end_time ? new Date(form.end_time).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+                      const newDateTime = `${existingDate}T${newTime}:00`;
+                      onChange({ target: { name: 'end_time', value: newDateTime } } as any);
+                    }}
+                    required
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Estimated Price (cents)</label>
+              <label className="block text-sm font-medium mb-1">Estimated Price ($)</label>
               <input 
                 name="estimated_price_cents" 
                 type="number" 
                 className="w-full rounded border px-3 py-2" 
                 value={form.estimated_price_cents || ''} 
                 onChange={onChange}
-                placeholder="e.g., 2500 for $25.00"
+                placeholder="Enter price amount"
               />
             </div>
             <div>

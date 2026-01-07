@@ -363,7 +363,7 @@ export default function BookingManagement() {
                       <div>{new Date(b.end_time).toLocaleString('en-GB', { hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
                     </div>
                   </td>
-                  <td className="p-2">${(b.estimated_price_cents ?? 0) / 100}</td>
+                  <td className="p-2">${(b.estimated_price_cents ?? 0) / 100 || 0}</td>
                   <td className="p-2">{b.service_id || '-'}</td>
                   <td className="p-2">
                     <Badge variant="outline" className="capitalize">
@@ -545,14 +545,14 @@ export default function BookingManagement() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Estimated Price (cents)</label>
+                    <label className="block text-sm font-medium mb-1">Estimated Price ($)</label>
                     <input 
                       name="estimated_price_cents" 
                       type="number" 
                       className="w-full rounded border px-3 py-2" 
                       value={editForm.estimated_price_cents || ''} 
                       onChange={onEditChange}
-                      placeholder="e.g., 2500 for $25.00"
+                      placeholder="Enter price amount"
                     />
                   </div>
                   <div>
