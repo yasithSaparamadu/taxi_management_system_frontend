@@ -24,6 +24,8 @@ const updateUserSchema = z.object({
     last_name: z.string().min(1).max(100).optional(),
     address: z.string().max(500).optional(),
     profile_image_url: z.string().optional().or(z.literal('')),
+    is_registered_customer: z.boolean().or(z.number().transform(val => val === 1)).optional(),
+    registered_number: z.string().max(100).optional(),
   }).optional(),
   driver_profile: z.object({
     license_number: z.string().min(1).max(50).optional(),
@@ -44,6 +46,8 @@ const createUserSchema = z.object({
     last_name: z.string().min(1).max(100),
     address: z.string().max(500).optional(),
     profile_image_url: z.string().optional().or(z.literal('')),
+    is_registered_customer: z.boolean().or(z.number().transform(val => val === 1)).optional(),
+    registered_number: z.string().max(100).optional(),
   }),
   driver_profile: z.object({
     license_number: z.string().min(1).max(50),
@@ -95,7 +99,7 @@ export const handleListUsers: RequestHandler = async (req, res) => {
     const usersQuery = `
       SELECT 
         u.id, u.email, u.role, u.status, u.created_at, u.updated_at, u.phone,
-        p.first_name, p.last_name, p.address, p.profile_image_url,
+        p.first_name, p.last_name, p.address, p.profile_image_url, p.is_registered_customer, p.registered_number,
         dp.license_number, 
         dp.employment_status,
         dp.id_proof_url,
@@ -119,11 +123,13 @@ export const handleListUsers: RequestHandler = async (req, res) => {
       phone: user.phone,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      profile: user.first_name || user.last_name || user.address || user.profile_image_url ? {
+      profile: user.first_name || user.last_name || user.address || user.profile_image_url || user.is_registered_customer || user.registered_number ? {
         first_name: user.first_name,
         last_name: user.last_name,
         address: user.address,
         profile_image_url: user.profile_image_url,
+        is_registered_customer: user.is_registered_customer,
+        registered_number: user.registered_number,
       } : undefined,
       driver_profile: user.license_number || user.employment_status || user.id_proof_url || user.work_permit_url ? {
         license_number: user.license_number,
@@ -156,7 +162,7 @@ export const handleGetUser: RequestHandler = async (req, res) => {
     const query = `
       SELECT 
         u.id, u.email, u.role, u.status, u.created_at, u.updated_at, u.phone,
-        p.first_name, p.last_name, p.address, p.profile_image_url,
+        p.first_name, p.last_name, p.address, p.profile_image_url, p.is_registered_customer, p.registered_number,
         dp.license_number, 
         dp.employment_status,
         dp.id_proof_url,
@@ -188,6 +194,8 @@ export const handleGetUser: RequestHandler = async (req, res) => {
         last_name: user.last_name,
         address: user.address,
         profile_image_url: user.profile_image_url,
+        is_registered_customer: user.is_registered_customer,
+        registered_number: user.registered_number,
       },
       driver_profile: {
         license_number: user.license_number,
@@ -220,6 +228,7 @@ export const handleCreateUser: RequestHandler = async (req, res) => {
       email: userData.email,
       password: userData.password,
       role: userData.role,
+      phone: userData.phone,
       profile: userData.profile,
       driver_profile: userData.driver_profile,
     });

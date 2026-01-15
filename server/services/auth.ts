@@ -21,6 +21,8 @@ export interface AuthUser {
     last_name?: string;
     address?: string;
     payment_preferences?: any;
+    is_registered_customer?: boolean;
+    registered_number?: string;
   };
   driver_profile?: {
     license_number?: string;
@@ -51,14 +53,9 @@ export class AuthService {
 
   static verifyToken(token: string): JWTPayload | null {
     try {
-      console.log("AuthService - Verifying token:", token.substring(0, 50) + "...");
-      console.log("AuthService - JWT_SECRET:", JWT_SECRET ? JWT_SECRET.substring(0, 10) + "..." : "UNDEFINED");
-      
       const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
-      console.log("AuthService - Token decoded successfully:", decoded);
       return decoded;
     } catch (error) {
-      console.log("AuthService - Token verification failed:", error);
       return null;
     }
   }
@@ -81,6 +78,8 @@ export class AuthService {
         p.last_name,
         p.address,
         p.payment_preferences,
+        p.is_registered_customer,
+        p.registered_number,
         dp.license_number,
         dp.id_proof_url,
         dp.work_permit_url,
@@ -105,7 +104,9 @@ export class AuthService {
         first_name: user.first_name,
         last_name: user.last_name,
         address: user.address,
-        payment_preferences: user.payment_preferences
+        payment_preferences: user.payment_preferences,
+        is_registered_customer: user.is_registered_customer,
+        registered_number: user.registered_number
       } : undefined,
       driver_profile: user.license_number ? {
         license_number: user.license_number,
@@ -128,6 +129,8 @@ export class AuthService {
         p.last_name,
         p.address,
         p.payment_preferences,
+        p.is_registered_customer,
+        p.registered_number,
         dp.license_number,
         dp.id_proof_url,
         dp.work_permit_url,
@@ -152,7 +155,9 @@ export class AuthService {
         first_name: user.first_name,
         last_name: user.last_name,
         address: user.address,
-        payment_preferences: user.payment_preferences
+        payment_preferences: user.payment_preferences,
+        is_registered_customer: user.is_registered_customer,
+        registered_number: user.registered_number
       } : undefined,
       driver_profile: user.license_number ? {
         license_number: user.license_number,
@@ -175,6 +180,8 @@ static async createUser(userData: {
     address?: string;
     profile_image_url?: string;
     payment_preferences?: any;
+    is_registered_customer?: boolean;
+    registered_number?: string;
   };
   driver_profile?: {
     license_number?: string;
@@ -200,15 +207,17 @@ static async createUser(userData: {
     // Rest of the method remains the same...
     if (userData.profile) {
       await connection.execute(`
-        INSERT INTO profiles (user_id, first_name, last_name, address, profile_image_url, payment_preferences)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO profiles (user_id, first_name, last_name, address, profile_image_url, payment_preferences, is_registered_customer, registered_number)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         userId,
         userData.profile.first_name || null,
         userData.profile.last_name || null,
         userData.profile.address || null,
         userData.profile.profile_image_url && userData.profile.profile_image_url.trim() !== '' ? userData.profile.profile_image_url : null,
-        userData.profile.payment_preferences ? JSON.stringify(userData.profile.payment_preferences) : null
+        userData.profile.payment_preferences ? JSON.stringify(userData.profile.payment_preferences) : null,
+        userData.profile.is_registered_customer || false,
+        userData.profile.registered_number || null
       ]);
     }
 

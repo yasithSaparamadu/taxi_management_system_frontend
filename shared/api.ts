@@ -89,8 +89,12 @@ export interface Booking {
   contact_email?: string | null;
   start_time: string; // ISO
   end_time: string;   // ISO
+  original_start_time?: string | null; // ISO - original scheduled time
+  original_end_time?: string | null;   // ISO - original end time
+  move_count: number; // Number of times this booking has been moved
   estimated_price_cents?: number | null;
   status: BookingStatus;
+  deleted: boolean; // Soft delete flag
   admin_note?: string | null;
   driver_id?: number | null;
   vehicle_id?: number | null;
@@ -120,6 +124,8 @@ export interface CreateBookingRequest {
   driver_id?: number | null;
   customer_id?: number; // Add customer_id field
   vehicle_id?: number | null; // Add vehicle_id field
+  is_registered_customer?: boolean; // Add registered customer flag
+  registered_number?: string; // Add registered customer number
 }
 
 export interface CreateBookingResponse { ok: boolean; id?: number; error?: string }
@@ -368,6 +374,8 @@ export interface UserProfile {
   phone?: string;
   address?: string;
   payment_preferences?: any;
+  is_registered_customer?: boolean;
+  registered_number?: string;
 }
 
 export interface DriverProfile {

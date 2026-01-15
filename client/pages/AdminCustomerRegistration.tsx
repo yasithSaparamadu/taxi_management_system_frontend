@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, User, Mail, Phone, Save, Upload, X, Eye } from 'lucide-react';
 
 interface CustomerFormData {
@@ -16,6 +17,8 @@ interface CustomerFormData {
   address: string;
   profile_image_url: string;
   profile_image_file?: File;
+  is_registered_customer: boolean;
+  registered_number: string;
 }
 
 export default function AdminCustomerRegistration() {
@@ -30,7 +33,9 @@ export default function AdminCustomerRegistration() {
     first_name: '',
     last_name: '',
     address: '',
-    profile_image_url: ''
+    profile_image_url: '',
+    is_registered_customer: false,
+    registered_number: '',
   });
 
   const [uploadFiles, setUploadFiles] = useState({
@@ -39,6 +44,15 @@ export default function AdminCustomerRegistration() {
 
   const handleInputChange = (field: keyof CustomerFormData, value: string | File) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCheckboxChange = (checked: boolean | string) => {
+    const isChecked = checked === true;
+    setFormData(prev => ({
+      ...prev,
+      is_registered_customer: isChecked,
+      registered_number: isChecked ? prev.registered_number : ''
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,7 +117,9 @@ export default function AdminCustomerRegistration() {
           first_name: formData.first_name,
           last_name: formData.last_name,
           address: formData.address,
-          profile_image_url: profileImageUrl
+          profile_image_url: profileImageUrl,
+          is_registered_customer: formData.is_registered_customer,
+          registered_number: formData.registered_number
         }
       };
       
@@ -134,7 +150,9 @@ export default function AdminCustomerRegistration() {
           first_name: '',
           last_name: '',
           address: '',
-          profile_image_url: ''
+          profile_image_url: '',
+          is_registered_customer: false,
+          registered_number: '',
         });
         setUploadFiles({
           profile_image_file: null
@@ -330,6 +348,31 @@ export default function AdminCustomerRegistration() {
                       rows={3}
                     />
                   </div>
+
+                  <div className="flex items-center space-x-2 py-2">
+                    <Checkbox
+                      id="is_registered_customer"
+                      checked={formData.is_registered_customer}
+                      onCheckedChange={handleCheckboxChange}
+                    />
+                    <Label htmlFor="is_registered_customer" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Is this a registered customer?
+                    </Label>
+                  </div>
+
+                  {formData.is_registered_customer && (
+                    <div>
+                      <Label htmlFor="registered_number" className="text-sm font-medium">Registered Number *</Label>
+                      <Input
+                        id="registered_number"
+                        type="text"
+                        placeholder="Enter registered customer number"
+                        value={formData.registered_number}
+                        onChange={(e) => handleInputChange('registered_number', e.target.value)}
+                        required={formData.is_registered_customer}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end space-x-4 pt-4">

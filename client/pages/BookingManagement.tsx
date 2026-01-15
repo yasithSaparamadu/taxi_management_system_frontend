@@ -6,7 +6,7 @@ import { selectToken } from "../store/auth";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../components/ui/alert-dialog";
-import { ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Check } from "lucide-react";
 
 export default function BookingManagement() {
   const token = useSelector(selectToken);
@@ -22,9 +22,9 @@ export default function BookingManagement() {
   const [editForm, setEditForm] = useState<UpdateBookingRequest>({});
   const [showEditForm, setShowEditForm] = useState(false);
   const [showEditConfirmDialog, setShowEditConfirmDialog] = useState(false);
-  const [showNoDriverConfirmDialog, setShowNoDriverConfirmDialog] = useState(false);
-  const [showDriverConfirmDialog, setShowDriverConfirmDialog] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'edit' | null>(null);
+  const [showSaveConfirmDialog, setShowSaveConfirmDialog] = useState(false);
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'edit' | 'delete' | null>(null);
 
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -180,30 +180,14 @@ export default function BookingManagement() {
   const onUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing) return;
+    setShowSaveConfirmDialog(true);
+  };
+
+  const confirmSave = () => {
+    setShowSaveConfirmDialog(false);
     setPendingAction('edit');
-    if (!editForm.driver_id) {
-      setShowNoDriverConfirmDialog(true);
-    } else {
-      setShowDriverConfirmDialog(true);
-    }
-  };
-
-  
-  const confirmNoDriver = () => {
-    setShowNoDriverConfirmDialog(false);
-    const updatedForm = { ...editForm, status: 'scheduled' as const };
-    console.log('Setting status to scheduled, form:', updatedForm); // Debug log
-    setEditForm(updatedForm);
-    // Call confirmUpdate directly with the updated form
-    confirmUpdateWithStatus(updatedForm);
-  };
-
-  const confirmDriver = () => {
-    setShowDriverConfirmDialog(false);
-    const updatedForm = { ...editForm, status: 'confirmed' as const };
-    console.log('Setting status to confirmed, form:', updatedForm); // Debug log
-    setEditForm(updatedForm);
-    // Call confirmUpdate directly with the updated form
+    // Directly proceed with update
+    const updatedForm = { ...editForm, status: editForm.driver_id ? 'confirmed' : 'scheduled' as const };
     confirmUpdateWithStatus(updatedForm);
   };
 
@@ -218,26 +202,22 @@ export default function BookingManagement() {
         Object.entries(formWithStatus).filter(([_, value]) => value !== undefined)
       );
       
-      console.log('Sending payload after filtering:', payload); // Debug log
-      
       const res = await fetch(`/api/bookings/${editing}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: headers(),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
-
-      const raw = await res.text();
-      const data: UpdateBookingResponse = raw ? JSON.parse(raw) : { ok: false, error: 'Empty response from server' };
-      
-      if (!res.ok || !data.ok) {
-        console.error('Server response:', raw); // Debug log
-        console.error('Parsed error:', data); // Debug log
-        throw new Error(data.error || raw || "Failed to update booking");
+      const data: UpdateBookingResponse = await res.json();
+      if (data.ok) {
+        setMessage('Booking updated successfully');
+        setShowEditForm(false);
+        setEditing(null);
+        setEditForm({});
+        load(); // Reload bookings
+      } else {
+        setError(data.error || 'Update failed');
       }
       
-      setMessage(`Booking #${editing} updated!`);
-      cancelEdit();
-      load();
       // Notify calendar page to refresh after driver assignment
       window.postMessage({ type: 'BOOKING_UPDATED', payload: { id: editing } }, window.location.origin);
       // Fallback: localStorage event for cross-tab sync
@@ -254,8 +234,59 @@ export default function BookingManagement() {
     await confirmUpdateWithStatus(editForm);
   };
 
+  const startDelete = (id: number) => {
+    setEditing(id);
+    setPendingAction('delete');
+    setShowDeleteConfirmDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!editing) return;
+    setPendingAction('delete');
+    try {
+      const res = await fetch(`/api/bookings/${editing}`, {
+        method: 'DELETE',
+        headers: headers()
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setMessage('Booking deleted successfully');
+        setShowDeleteConfirmDialog(false);
+        setEditing(null);
+        load(); // Reload bookings
+      } else {
+        setError(data.error || 'Delete failed');
+      }
+    } catch (err) {
+      setError('Delete failed');
+      console.error(err);
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const confirmBooking = async (bookingId: number) => {
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/confirm`, {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (data.ok) {
+        alert(`✅ Booking #${bookingId} confirmed successfully!`);
+        load(); // Reload bookings
+      } else {
+        setError(data.error || 'Confirm failed');
+      }
+    } catch (err) {
+      setError('Confirm failed');
+      console.error(err);
+    }
+  };
+
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-[1800px] mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Booking Management</h1>
         <div className="flex gap-2">
@@ -343,7 +374,18 @@ export default function BookingManagement() {
                   <td className="p-2">{b.id}</td>
                   <td className="p-2">
                     <div>
-                      <div className="font-medium">{getCustomerDisplay(b)}</div>
+                      <div className="font-medium flex items-center gap-2">
+                        {getCustomerDisplay(b)}
+                        {anyB.customer_id ? (
+                          <Badge variant="secondary" className="text-xs">
+                            Registered
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            Guest
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-gray-500">ID: {anyB.customer_id || '-'}</div>
                     </div>
                   </td>
@@ -374,6 +416,25 @@ export default function BookingManagement() {
                     <div className="flex gap-1">
                       <Button variant="outline" size="sm" onClick={() => startEdit(b)}>
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      {b.status === 'scheduled' && (
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          onClick={() => confirmBooking(b.id)}
+                          title="Confirm booking"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => startDelete(b.id)}
+                        disabled={b.status === 'completed'}
+                        title={b.status === 'completed' ? 'Cannot delete completed bookings' : 'Delete booking'}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </td>
@@ -647,34 +708,34 @@ export default function BookingManagement() {
         </div>
       )}
 
-      {/* No Driver Confirmation Dialog */}
-      <AlertDialog open={showNoDriverConfirmDialog} onOpenChange={setShowNoDriverConfirmDialog}>
+      {/* Save Confirmation Dialog */}
+      <AlertDialog open={showSaveConfirmDialog} onOpenChange={setShowSaveConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>No driver assigned</AlertDialogTitle>
+            <AlertDialogTitle>Save Changes?</AlertDialogTitle>
             <AlertDialogDescription>
-              No driver assigned, booking saved without confirm and not show in the calendar view as well. Are you sure you want to proceed?
+              Are you sure you want to save the changes to booking #{editing}? This will update the booking with the new information.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmNoDriver}>Proceed</AlertDialogAction>
+            <AlertDialogAction onClick={confirmSave}>Save Changes</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Driver Confirmation Dialog */}
-      <AlertDialog open={showDriverConfirmDialog} onOpenChange={setShowDriverConfirmDialog}>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Driver assigned</AlertDialogTitle>
+            <AlertDialogTitle>Delete Booking</AlertDialogTitle>
             <AlertDialogDescription>
-              Driver assigned. This booking will be confirmed and shown in the calendar. Are you sure?
+              Are you sure you want to delete booking #{editing}? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDriver}>Confirm Booking</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete Booking</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

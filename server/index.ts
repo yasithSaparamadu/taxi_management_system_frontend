@@ -8,7 +8,9 @@ import {
   confirmBooking,
   decideBooking,
   updateBooking,
-  listBookings
+  deleteBooking,
+  listBookings,
+  listCalendarBookings
 } from "./routes/bookings";
 import { 
   searchVehicles,
@@ -93,9 +95,11 @@ export function createServer() {
   // Booking routes
   app.post("/api/bookings", authenticate, createBooking);
   app.get("/api/bookings", authenticate, listBookings);
+  app.get("/api/bookings/calendar", authenticate, listCalendarBookings);
   app.patch("/api/bookings/:id/confirm", authenticate, confirmBooking);
   app.patch("/api/bookings/:id/decide", authenticate, decideBooking);
   app.patch("/api/bookings/:id", authenticate, updateBooking);
+  app.delete("/api/bookings/:id", authenticate, deleteBooking);
 
   // Test endpoint for debugging
   app.get("/api/auth-test", authenticate, (req, res) => {

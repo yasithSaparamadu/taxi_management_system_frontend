@@ -91,14 +91,16 @@ export const createBooking: RequestHandler = async (req, res) => {
     staff_id, pickup_point, dropoff_point, special_instructions,
     contact_name, contact_phone, contact_email,
     start_time, end_time, estimated_price_cents,
-    status, admin_note, driver_id, customer_id, vehicle_id
+    status, admin_note, driver_id, customer_id, vehicle_id,
+    move_count
   ) VALUES (
     ?, ?, ?, NULLIF(?, ''),           -- created_by_name
     ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), 
     NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), 
     ?, ?, ?,                          -- start/end/price
     ?, NULLIF(?, ''),                 -- status / admin_note
-    ?, ?, ?                           -- driver, customer, vehicle
+    ?, ?, ?,                           -- driver, customer, vehicle
+    0                                  -- move_count (starts at 0)
   )`,
   [
     b.service_id,
@@ -239,7 +241,7 @@ const ConfirmSchema = z.object({
 
 export const confirmBooking: RequestHandler = async (req, res) => {
   try {
-    const role = getRoleFromHeaders(req);
+    const role = (req as any).user?.role ?? getRoleFromHeaders(req);
     if (role !== 'admin') {
       return res.status(401).json({ ok: false, error: 'Admin only' } as ConfirmBookingResponse);
     }
@@ -263,14 +265,12 @@ export const confirmBooking: RequestHandler = async (req, res) => {
       }
     }
 
-    // Generate a customer verification token if not exists
-    const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    // Update booking status
     await pool.execute(
       `UPDATE bookings
-       SET status='confirmed', confirmed_at=NOW(), driver_id=COALESCE(?, driver_id),
-           customer_verify_token = COALESCE(customer_verify_token, ?)
+       SET status='confirmed', confirmed_at=NOW(), driver_id=COALESCE(?, driver_id)
        WHERE id=?`,
-      [d.driver_id ?? null, token, id]
+      [d.driver_id ?? null, id]
     );
 
     await pool.execute(
@@ -282,22 +282,21 @@ export const confirmBooking: RequestHandler = async (req, res) => {
     // Calendar sync
     try { await upsertCalendarEvent(id); } catch (e) { console.warn('[calendar] upsert failed', e); }
 
-    // Email customer with verification link (if we have contact email)
+    // Email customer with confirmation (if we have contact email)
     const baseUrl = process.env.BASE_URL || "http://localhost:8080";
-    const [rows] = await pool.query<any[]>(`SELECT contact_email, pickup_point, dropoff_point, start_time, end_time, customer_verify_token, driver_id FROM bookings WHERE id=?`, [id]);
+    const [rows] = await pool.query<any[]>(`SELECT contact_email, pickup_point, dropoff_point, start_time, end_time, driver_id FROM bookings WHERE id=?`, [id]);
     const row = Array.isArray(rows) ? rows[0] : undefined;
-    if (row?.contact_email && row?.customer_verify_token) {
-      const verifyUrl = `${baseUrl}/api/bookings/${id}/customer-verify?token=${encodeURIComponent(row.customer_verify_token)}`;
+    if (row?.contact_email) {
       await sendEmail({
         to: row.contact_email,
-        subject: `Booking confirmed - please verify details`,
-        html: `<p>Your booking has been confirmed. Please verify the details:</p>
+        subject: `Booking confirmed`,
+        html: `<p>Your booking has been confirmed. Here are the details:</p>
 <ul>
   <li>When: ${new Date(row.start_time).toISOString()} to ${new Date(row.end_time).toISOString()}</li>
   <li>Pickup: ${row.pickup_point ?? ''}</li>
   <li>Dropoff: ${row.dropoff_point ?? ''}</li>
 </ul>
-<p>Click to verify: <a href="${verifyUrl}">${verifyUrl}</a></p>`
+<p>Your booking is now confirmed and will appear in the calendar.</p>`
       });
     }
 
@@ -353,6 +352,53 @@ const UpdateSchema = z.object({
   vehicle_id: z.coerce.number().int().positive().nullable().optional(),
 });
 
+export const deleteBooking: RequestHandler = async (req, res) => {
+  try {
+    const role = (req as any).user?.role ?? getRoleFromHeaders(req);
+    if (role !== 'admin') {
+      return res.status(401).json({ ok: false, error: 'Admin only' });
+    }
+
+    const id = Number(req.params.id);
+    if (!id) {
+      return res.status(400).json({ ok: false, error: 'Invalid booking id' });
+    }
+
+    // Check if booking exists
+    const [existing] = await pool.execute<any[]>(
+      'SELECT id, status FROM bookings WHERE id = ?',
+      [id]
+    );
+
+    if (!existing.length) {
+      return res.status(404).json({ ok: false, error: 'Booking not found' });
+    }
+
+    const booking = existing[0];
+
+    // Prevent deletion of completed bookings (optional business rule)
+    if (booking.status === 'completed') {
+      return res.status(400).json({ ok: false, error: 'Cannot delete completed booking' });
+    }
+
+    // Soft delete the booking (update deleted flag)
+    await pool.execute('UPDATE bookings SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+
+    // Audit log
+    await pool.execute(
+      `INSERT INTO bookings_audit (booking_id, actor_role, action, admin_only_note)
+       VALUES (?, 'admin', 'delete', NULL)`,
+      [id]
+    );
+
+    return res.json({ ok: true, message: 'Booking deleted successfully' });
+
+  } catch (error) {
+    console.error('Delete booking error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
+
 export const updateBooking: RequestHandler = async (req, res) => {
   try {
     const role = (req as any).user?.role ?? getRoleFromHeaders(req);
@@ -390,12 +436,38 @@ export const updateBooking: RequestHandler = async (req, res) => {
       }
     }
 
+    // Get current booking to check if dates are changing
+    const [currentBooking] = await pool.execute<any[]>(
+      'SELECT start_time, end_time, original_start_time, move_count FROM bookings WHERE id = ?',
+      [id]
+    );
+    if (!currentBooking.length) {
+      return res.status(404).json({ ok: false, error: 'Booking not found' } as UpdateBookingResponse);
+    }
+    const current = currentBooking[0];
+
+    // Check if start_time is being updated
+    const isDateChanging = b.start_time && b.start_time !== current.start_time;
+    
     // Build dynamic update
     const fields: string[] = [];
     const vals: any[] = [];
     if (b.service_id !== undefined) { fields.push('service_id=?'); vals.push(b.service_id); }
-    if (b.start_time !== undefined) { fields.push('start_time=?'); vals.push(new Date(b.start_time).toISOString().slice(0, 19).replace('T', ' ')); }
-    if (b.end_time !== undefined) { fields.push('end_time=?'); vals.push(new Date(b.end_time).toISOString().slice(0, 19).replace('T', ' ')); }
+    if (b.start_time !== undefined) { 
+      // Always update original dates when booking is moved (to show most recent previous date)
+      if (isDateChanging) {
+        fields.push('original_start_time=?'); 
+        vals.push(current.start_time);
+        fields.push('original_end_time=?'); 
+        vals.push(current.end_time);
+      }
+      fields.push('start_time=?'); 
+      vals.push(new Date(b.start_time).toISOString().slice(0, 19).replace('T', ' ')); 
+    }
+    if (b.end_time !== undefined) { 
+      fields.push('end_time=?'); 
+      vals.push(new Date(b.end_time).toISOString().slice(0, 19).replace('T', ' ')); 
+    }
     if (b.source !== undefined) { fields.push('source=?'); vals.push(b.source); }
     if (b.pickup_point !== undefined) { fields.push('pickup_point=NULLIF(?, "")'); vals.push(b.pickup_point ?? ''); }
     if (b.dropoff_point !== undefined) { fields.push('dropoff_point=NULLIF(?, "")'); vals.push(b.dropoff_point ?? ''); }
@@ -410,6 +482,11 @@ export const updateBooking: RequestHandler = async (req, res) => {
     if (b.driver_id !== undefined) { fields.push('driver_id=?'); vals.push(b.driver_id); }
     if (b.customer_id !== undefined) { fields.push('customer_id=?'); vals.push(b.customer_id); }
     if (b.vehicle_id !== undefined) { fields.push('vehicle_id=?'); vals.push(b.vehicle_id); }
+    
+    // Increment move count if date is changing
+    if (isDateChanging) {
+      fields.push('move_count=move_count+1');
+    }
 
     if (fields.length === 0) {
       return res.json({ ok: true } as UpdateBookingResponse);
@@ -475,7 +552,7 @@ export const updateBooking: RequestHandler = async (req, res) => {
   }
 };
 
-export const listBookings: RequestHandler = async (req, res) => {
+export const listCalendarBookings: RequestHandler = async (req, res) => {
   try {
     // Use JWT authentication like users route
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -484,7 +561,7 @@ export const listBookings: RequestHandler = async (req, res) => {
     }
 
     const { status, source } = req.query as { status?: string; source?: string };
-    const conditions: string[] = [];
+    const conditions: string[] = ['b.status = "confirmed"']; // Only show confirmed bookings in calendar
     const params: any[] = [];
 
     if (status) {
@@ -508,11 +585,15 @@ export const listBookings: RequestHandler = async (req, res) => {
         b.created_by_name,
         b.start_time,
         b.end_time,
+        b.original_start_time,
+        b.original_end_time,
+        b.move_count,
         b.pickup_point,
         b.dropoff_point,
         b.special_instructions,
         b.estimated_price_cents,
         b.status,
+        b.deleted,
         b.admin_note,
         b.driver_id,
         b.vehicle_id,
@@ -538,6 +619,90 @@ export const listBookings: RequestHandler = async (req, res) => {
       ...b,
       start_time: new Date(b.start_time).toISOString(),
       end_time: new Date(b.end_time).toISOString(),
+      original_start_time: toIsoOrNull(b.original_start_time),
+      original_end_time: toIsoOrNull(b.original_end_time),
+      confirmed_at: toIsoOrNull(b.confirmed_at),
+      assigned_at: toIsoOrNull(b.assigned_at),
+      created_at: new Date(b.created_at).toISOString(),
+      updated_at: new Date(b.updated_at).toISOString(),
+    }));
+
+    return res.json({ ok: true, items } as ListBookingsResponse);
+  } catch (err: any) {
+    console.error('Error in listCalendarBookings:', err);
+    return res.status(500).json({ ok: false, items: [] } as ListBookingsResponse);
+  }
+};
+
+export const listBookings: RequestHandler = async (req, res) => {
+  try {
+    // Use JWT authentication like users route
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ ok: false, items: [] } as ListBookingsResponse);
+    }
+
+    const { status, source } = req.query as { status?: string; source?: string };
+    const conditions: string[] = ['b.deleted = 0']; // Exclude deleted bookings
+    const params: any[] = [];
+
+    if (status) {
+      conditions.push('b.status = ?');
+      params.push(status);
+    }
+
+    if (source) {
+      conditions.push('b.source = ?');
+      params.push(source);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const query = `
+      SELECT 
+        b.id,
+        b.service_id,
+        b.source,
+        b.created_by_role,
+        b.created_by_name,
+        b.start_time,
+        b.end_time,
+        b.original_start_time,
+        b.original_end_time,
+        b.move_count,
+        b.pickup_point,
+        b.dropoff_point,
+        b.special_instructions,
+        b.estimated_price_cents,
+        b.status,
+        b.deleted,
+        b.admin_note,
+        b.driver_id,
+        b.vehicle_id,
+        b.customer_id,
+        b.contact_name,
+        b.contact_phone,
+        b.contact_email,
+        b.confirmed_at,
+        b.assigned_at,
+        b.outlook_event_id,
+        b.created_at,
+        b.updated_at
+      FROM bookings b 
+      ${whereClause}
+      ORDER BY b.created_at DESC
+    `;
+
+    const [bookings] = await pool.execute(query, params) as [any[], any];
+
+    const toIsoOrNull = (v: any) => (v ? new Date(v).toISOString() : null);
+
+    const items = bookings.map((b: any) => ({
+      ...b,
+      start_time: new Date(b.start_time).toISOString(),
+      end_time: new Date(b.end_time).toISOString(),
+      original_start_time: toIsoOrNull(b.original_start_time),
+      original_end_time: toIsoOrNull(b.original_end_time),
       confirmed_at: toIsoOrNull(b.confirmed_at),
       assigned_at: toIsoOrNull(b.assigned_at),
       created_at: new Date(b.created_at).toISOString(),

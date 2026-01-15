@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, User, Mail, Phone, Search, Edit, Eye, Upload, X, Camera, MapPin, Check } from 'lucide-react';
 
 interface Customer {
@@ -20,6 +21,8 @@ interface Customer {
     last_name: string;
     address: string;
     profile_image_url?: string;
+    is_registered_customer?: boolean;
+    registered_number?: string;
   };
 }
 
@@ -28,6 +31,7 @@ export default function AdminCustomerManagement() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'suspended'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -37,7 +41,9 @@ export default function AdminCustomerManagement() {
     last_name: '',
     phone: '',
     address: '',
-    profile_image_url: ''
+    profile_image_url: '',
+    is_registered_customer: false,
+    registered_number: ''
   });
 
   const [uploadFiles, setUploadFiles] = useState({
@@ -73,12 +79,16 @@ export default function AdminCustomerManagement() {
 
   const handleEdit = (customer: Customer) => {
     setSelectedCustomer(customer);
+    setError('');
+    setSuccess('');
     setEditForm({
       first_name: customer.profile.first_name || '',
       last_name: customer.profile.last_name || '',
       phone: customer.phone || '',
       address: customer.profile.address || '',
-      profile_image_url: customer.profile.profile_image_url || ''
+      profile_image_url: customer.profile.profile_image_url || '',
+      is_registered_customer: customer.profile.is_registered_customer || false,
+      registered_number: customer.profile.registered_number || ''
     });
     setUploadFiles({
       profile_image_file: null
@@ -91,6 +101,9 @@ export default function AdminCustomerManagement() {
     if (!selectedCustomer) return;
 
     setLoading(true);
+    setError('');
+    setSuccess('');
+    
     try {
       const token = localStorage.getItem('token');
       
@@ -134,7 +147,9 @@ export default function AdminCustomerManagement() {
             first_name: editForm.first_name,
             last_name: editForm.last_name,
             address: editForm.address,
-            profile_image_url: profileImageUrl
+            profile_image_url: profileImageUrl,
+            is_registered_customer: editForm.is_registered_customer,
+            registered_number: editForm.registered_number
           }
         })
       });
@@ -144,12 +159,29 @@ export default function AdminCustomerManagement() {
       }
 
       setShowEditModal(false);
+      setSuccess('Customer updated successfully!');
       fetchCustomers(); // Refresh the list
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to update customer');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCheckboxChange = (checked: boolean | string) => {
+    const isChecked = checked === true;
+    setEditForm(prev => ({
+      ...prev,
+      is_registered_customer: isChecked,
+      registered_number: isChecked ? prev.registered_number : ''
+    }));
   };
 
   const filteredCustomers = customers.filter(customer => {
@@ -467,12 +499,37 @@ export default function AdminCustomerManagement() {
                           <Input
                             id="address"
                             value={editForm.address}
-                            onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                            onChange={(e) => handleInputChange('address', e.target.value)}
                             className="pl-10"
                             placeholder="123 Main St, City, State 12345"
                           />
                         </div>
                       </div>
+
+                      <div className="flex items-center space-x-2 py-2">
+                        <Checkbox
+                          id="is_registered_customer"
+                          checked={editForm.is_registered_customer}
+                          onCheckedChange={handleCheckboxChange}
+                        />
+                        <Label htmlFor="is_registered_customer" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                          Is this a registered customer?
+                        </Label>
+                      </div>
+
+                      {editForm.is_registered_customer && (
+                        <div>
+                          <Label htmlFor="registered_number" className="text-sm font-medium">Registered Number *</Label>
+                          <Input
+                            id="registered_number"
+                            type="text"
+                            placeholder="Enter registered customer number"
+                            value={editForm.registered_number}
+                            onChange={(e) => handleInputChange('registered_number', e.target.value)}
+                            required={editForm.is_registered_customer}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -539,6 +596,17 @@ export default function AdminCustomerManagement() {
           <Alert className="border-red-200 bg-red-50">
             <AlertDescription className="text-red-800">
               {error}
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Success Alert */}
+      {success && (
+        <div className="fixed bottom-4 right-4 max-w-sm">
+          <Alert className="border-green-200 bg-green-50">
+            <AlertDescription className="text-green-800">
+              {success}
             </AlertDescription>
           </Alert>
         </div>

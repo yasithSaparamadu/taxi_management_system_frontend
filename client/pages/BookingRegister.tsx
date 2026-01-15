@@ -5,7 +5,8 @@ import type { CreateBookingRequest, CreateBookingResponse, ListBookingsResponse,
 import { selectToken } from "../store/auth";
 import { Button } from "../components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../components/ui/alert-dialog";
-import { ArrowLeft } from "lucide-react";
+import { Checkbox } from "../components/ui/checkbox";
+import { ArrowLeft, Check } from "lucide-react";
 
 export default function BookingRegister() {
   const token = useSelector(selectToken);
@@ -38,6 +39,8 @@ export default function BookingRegister() {
     contact_phone: "",
     contact_email: "",
     vehicle_id: null,
+    is_registered_customer: false,
+    registered_number: "",
   });
 
   const headers = (): Record<string, string> => {
@@ -91,8 +94,15 @@ export default function BookingRegister() {
         const customer = customers.find(c => Number(c.id) === Number(value));
         if (customer) {
           updated.contact_name = `${customer.profile?.first_name || ''} ${customer.profile?.last_name || ''}`.trim();
-          updated.contact_phone = customer.profile?.phone || '';
+          updated.contact_phone = customer.phone || '';
           updated.contact_email = customer.email || '';
+          // Auto-set registration status from customer profile
+          updated.is_registered_customer = customer.profile?.is_registered_customer || false;
+          updated.registered_number = customer.profile?.registered_number || '';
+        } else {
+          // Reset registration fields when no customer is selected
+          updated.is_registered_customer = false;
+          updated.registered_number = '';
         }
       }
       
@@ -100,13 +110,11 @@ export default function BookingRegister() {
     });
   };
 
+  
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.driver_id) {
-      setShowNoDriverConfirmDialog(true);
-    } else {
-      setShowDriverConfirmDialog(true);
-    }
+    // Directly create booking without confirmation
+    doCreate();
   };
 
   const doCreate = async () => {
@@ -119,14 +127,24 @@ export default function BookingRegister() {
         Object.entries(form).filter(([_, value]) => value !== undefined)
       );
       
+      // Set status based on driver assignment
+      const finalPayload = {
+        ...payload,
+        status: form.driver_id ? 'confirmed' : 'scheduled'
+      };
+      
       const res = await fetch(`/api/bookings`, {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(finalPayload),
       });
       const data: CreateBookingResponse = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Failed to create booking");
-      setMessage(`Booking #${data.id} created!`);
+      
+      // Show success message in popup style
+      alert(`✅ Booking #${data.id} created successfully!`);
+      
+      // Reset form
       setForm({
         service_id: 1,
         start_time: "",
@@ -144,6 +162,73 @@ export default function BookingRegister() {
         contact_phone: "",
         contact_email: "",
         vehicle_id: null,
+        is_registered_customer: false,
+        registered_number: "",
+      });
+      setCreating(false);
+      
+      // Notify calendar page to refresh after booking creation
+      window.postMessage({ type: 'BOOKING_UPDATED', payload: { id: data.id } }, window.location.origin);
+      localStorage.setItem('taxi_booking_updated', Date.now().toString());
+      
+      // Refresh page after a short delay to allow user to see the message
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
+    } catch (e: any) {
+      setError(e.message);
+      setCreating(false);
+    }
+  };
+
+  const doCreateAndConfirm = async () => {
+    setCreating(true);
+    setMessage(null);
+    setError(null);
+    try {
+      // Filter out undefined values before sending
+      const payload = Object.fromEntries(
+        Object.entries(form).filter(([_, value]) => value !== undefined)
+      );
+      
+      const res = await fetch(`/api/bookings`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(payload),
+      });
+      const data: CreateBookingResponse = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to create booking");
+      
+      // Now confirm the booking
+      const confirmRes = await fetch(`/api/bookings/${data.id}/confirm`, {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({})
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmRes.ok || !confirmData.ok) throw new Error(confirmData.error || "Failed to confirm booking");
+      
+      setMessage(`Booking #${data.id} created and confirmed!`);
+      setForm({
+        service_id: 1,
+        start_time: "",
+        end_time: "",
+        source: "phone",
+        estimated_price_cents: undefined,
+        admin_note: "",
+        created_by_name: "",
+        pickup_point: "",
+        dropoff_point: "",
+        special_instructions: "",
+        driver_id: null,
+        customer_id: undefined,
+        contact_name: "",
+        contact_phone: "",
+        contact_email: "",
+        vehicle_id: null,
+        is_registered_customer: false,
+        registered_number: "",
       });
       setCreating(false);
       // Notify calendar page to refresh after booking creation
@@ -203,7 +288,10 @@ export default function BookingRegister() {
                 <option value="">Select a customer...</option>
                 {customers.map(customer => (
                   <option key={customer.id} value={customer.id}>
-                    {customer.profile?.first_name} {customer.profile?.last_name} {customer.email ? `(${customer.email})` : ''}
+                    {customer.profile?.first_name} {customer.profile?.last_name} {customer.email ? `(${customer.email})` : ''} 
+                    {customer.profile?.is_registered_customer ? ' [Registered' : ''}
+                    {customer.profile?.is_registered_customer && customer.profile?.registered_number ? ` #${customer.profile.registered_number}` : ''}
+                    {customer.profile?.is_registered_customer ? ']' : ''}
                   </option>
                 ))}
               </select>
@@ -220,6 +308,20 @@ export default function BookingRegister() {
                 placeholder="Customer name will be auto-filled from selection"
                 readOnly
               />
+            </div>
+
+            <div className="flex items-center space-x-2 py-2">
+              <div className="flex items-center space-x-2">
+                <div className={`w-3 h-3 rounded-full ${form.is_registered_customer ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                <span className="text-sm font-medium">
+                  {form.is_registered_customer ? 'Registered Customer' : 'Regular Customer'}
+                </span>
+                {form.is_registered_customer && form.registered_number && (
+                  <span className="text-sm text-gray-600">
+                    (#{form.registered_number})
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -438,6 +540,7 @@ export default function BookingRegister() {
             />
           </div>
 
+          <div className="flex gap-3">
           <button 
             type="submit" 
             disabled={creating}
@@ -445,40 +548,26 @@ export default function BookingRegister() {
           >
             {creating ? "Creating..." : "Create Booking"}
           </button>
+          <button 
+            type="button"
+            disabled={creating}
+            onClick={(e) => {
+              e.preventDefault();
+              doCreateAndConfirm();
+            }}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            {creating ? "Creating..." : (
+              <>
+                <Check className="h-4 w-4" />
+                Create & Confirm
+              </>
+            )}
+          </button>
+        </div>
         </form>
       </div>
 
-      {/* No Driver Confirmation Dialog */}
-      <AlertDialog open={showNoDriverConfirmDialog} onOpenChange={setShowNoDriverConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>No driver assigned</AlertDialogTitle>
-            <AlertDialogDescription>
-              No driver assigned, booking saved without confirm and not show in the calendar view as well. Are you sure you want to proceed?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmNoDriver}>Proceed</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Driver Confirmation Dialog */}
-      <AlertDialog open={showDriverConfirmDialog} onOpenChange={setShowDriverConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Driver assigned</AlertDialogTitle>
-            <AlertDialogDescription>
-              Driver assigned. This booking will be confirmed and shown in the calendar. Are you sure?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDriver}>Confirm Booking</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

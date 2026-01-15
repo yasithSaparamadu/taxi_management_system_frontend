@@ -42,7 +42,7 @@ export default function CalendarPage() {
         return;
       }
 
-      const response = await fetch('/api/bookings', {
+      const response = await fetch('/api/bookings/calendar', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ export default function CalendarPage() {
         const data: ListBookingsResponse = await response.json();
         if (data.ok && data.items) {
           const calendarEvents = data.items
-            .filter(booking => booking.status === 'confirmed')
+            .filter(booking => booking.status === 'confirmed') // Only show confirmed bookings
             .map(transformBookingToEvent);
           setEvents(calendarEvents);
           setAuthError(false);
@@ -82,19 +82,25 @@ export default function CalendarPage() {
     const startDate = new Date(booking.start_time);
     const endDate = new Date(booking.end_time);
     
+    // Use original dates from database if available
+    const originalDate = booking.original_start_time ? new Date(booking.original_start_time) : null;
+    
     return {
       id: booking.id.toString(),
-      title: `${booking.pickup_point || 'Booking'} - ${booking.contact_name || 'Customer'}`,
+      title: `${booking.pickup_point || 'Booking'} - ${booking.contact_name || 'Customer'}${booking.deleted ? ' (Deleted)' : ''}`,
       date: startDate,
       startTime: formatTime(startDate),
       endTime: formatTime(endDate),
       type: "booking",
-      status: booking.status as "confirmed" | "pending" | "cancelled" | "completed",
+      status: booking.deleted ? 'deleted' as any : booking.status as "confirmed" | "pending" | "cancelled" | "completed",
       customer: booking.contact_name || undefined,
       driver: booking.driver_id ? `Driver ID: ${booking.driver_id}` : undefined,
       location: booking.pickup_point || undefined,
       description: booking.special_instructions || booking.dropoff_point || '',
-      color: getStatusColor(booking.status)
+      color: booking.deleted ? '#ef4444' : getStatusColor(booking.status), // Red for deleted bookings
+      originalDate: originalDate,
+      isMoved: !!originalDate && booking.move_count > 0,
+      isDeleted: booking.deleted
     };
   };
 
@@ -142,7 +148,10 @@ export default function CalendarPage() {
 
   return (
     <div className="h-full">
-      <OutlookCalendar events={events} onRefresh={handleRefresh} />
+      <OutlookCalendar 
+        events={events} 
+        onRefresh={handleRefresh} 
+      />
     </div>
   );
 }

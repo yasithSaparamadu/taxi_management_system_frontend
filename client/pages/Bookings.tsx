@@ -1215,22 +1215,6 @@ export default function Bookings() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Driver Confirmation Dialog */}
-      <AlertDialog open={showDriverConfirmDialog} onOpenChange={setShowDriverConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Driver assigned</AlertDialogTitle>
-            <AlertDialogDescription>
-              Driver assigned. This booking will be confirmed and shown in the calendar. Are you sure?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDriver}>Confirm Booking</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Edit Confirmation Dialog */}
       <AlertDialog open={showEditConfirmDialog} onOpenChange={setShowEditConfirmDialog}>
         <AlertDialogContent>

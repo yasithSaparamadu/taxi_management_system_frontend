@@ -18,35 +18,24 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log("Auth middleware - No token provided");
+   
       res.status(401).json({ error: 'No token provided' });
       return;
     }
 
     const token = authHeader.substring(7);
-    console.log("Auth middleware - Received token:", token.substring(0, 50) + "...");
+
     
     // Verify token format and signature
     const payload = AuthService.verifyToken(token);
-    console.log("Auth middleware - Payload:", payload);
+   
     if (!payload) {
-      console.log("Auth middleware - Token verification failed");
       res.status(401).json({ error: 'Invalid token' });
       return;
     }
 
-    // TEMPORARILY BYPASS SESSION CHECK FOR DEBUGGING
-    console.log("Auth middleware - BYPASSING session check for debugging");
-    
-    // Check if token is still valid in sessions
-    // const isTokenValid = await AuthService.isTokenValid(token);
-    // console.log("Auth middleware - Token valid in sessions:", isTokenValid);
-    // if (!isTokenValid) {
-    //   console.log("Auth middleware - Token not valid in sessions");
-    //   res.status(401).json({ error: 'Token expired or revoked' });
-    //   return;
-    // }
 
+ 
     // Check user status
     if (payload.status !== 'active') {
       res.status(403).json({ error: 'Account is not active' });
